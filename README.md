@@ -1,26 +1,46 @@
 # how to
 
 ## install dependencies
-better if you create a venv first
-pip install requirements.txt
+- optionally create venv
+```
+pip install -r requirements.txt
+```
 
 ## launch dockers
+```
+docker compose down
 
-### first time (create a container)
-- docker run --name zookeeper -p 2181:2181 zookeeper
-- docker run --name kafka -p 9092:9092 -e KAFKA_ZOOKEEPER_CONNECT=172.27.32.1:2181 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://172.27.32.1:9092 -e KAFKA_OFFSET_TOPIC_REPLICATION_FACTOR=1 confluentinc/cp-kafka
-- docker run --name redis -d redis
+docker compose up -d
+```
 
-### successive times (just run it)
-- docker start zookeeper -i
-- docker start kafka -i
-- docker start redis -i
 
+
+## load municipalities geohash
+```
+python data/mun_redis_loader.py 
+```
 
 ## run open_meteo_scraper
-python open_meteo_scraper/open_meteo_scraper.py 
+```
+python open_meteo_api_caller/open_meteo_api_caller.py 
+```
 
 ## run wereable_simulator
+```
 python wereable_simulator/wereable_simulator.py 
+```
+## run spark streaming
 
-- to display results pyton simple_consumer.py
+```
+docker cp pyspark/app.py spark-master:/tmp/app.py
+
+docker exec -it spark-master bash -c "pip install redis" 
+
+docker exec -it spark-worker bash -c "pip install redis" 
+
+docker exec -it spark-master /opt/bitnami/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 \
+  /tmp/app.py
+```
+

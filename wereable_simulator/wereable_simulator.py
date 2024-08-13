@@ -93,7 +93,8 @@ while True:
         'TEMP': temp,
         'HRV': hrv,
         "LAT": lat,
-        "LNG": lng
+        "LNG": lng,
+        "timestamp": time.time()
     }
 
     send_data_to_kafka(producer, KAFKA_TOPIC, data)

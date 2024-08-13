@@ -111,7 +111,6 @@ def fetch_data(df_mun):
 
 
 def main():
-
     # Load municipalities data: ['istat', 'comune', 'lng', 'lat']
     df_mun = pd.read_json(os.path.join("data", "trentino_municipalities.json"))
     # decomment to not waste too many apis

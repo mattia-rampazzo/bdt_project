@@ -16,8 +16,11 @@ openmeteo_requests==1.2.0
 openmeteo_sdk==1.11.7
 pandas==2.2.2
 platformdirs==4.2.2
+py4j==0.10.9.7
 pydantic==1.10.16
+pyspark==3.4.0
 python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
 pytz==2024.1
 redis==5.0.6
 requests==2.32.3

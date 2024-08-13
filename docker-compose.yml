@@ -2,96 +2,18 @@ version: '2'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
-  # zookeeper-1:
-  #   image: confluentinc/cp-zookeeper:latest
-  #   environment:
-  #     ZOOKEEPER_SERVER_ID: 1
-  #     ZOOKEEPER_CLIENT_PORT: 22181
-  #     ZOOKEEPER_TICK_TIME: 2000
-  #     ZOOKEEPER_INIT_LIMIT: 5
-  #     ZOOKEEPER_SYNC_LIMIT: 2
-  #     ZOOKEEPER_SERVERS: zookeeper-1:22888:23888;zookeeper-2:32888:33888;zookeeper-3:42888:43888
-  #   ports:
-  #     - "22181:22181"
-  #     - "22888:22888"
-  #     - "23888:23888"
+    networks:
+      - bigdata
 
-  # zookeeper-2:
-  #   image: confluentinc/cp-zookeeper:latest
-  #   environment:
-  #     ZOOKEEPER_SERVER_ID: 2
-  #     ZOOKEEPER_CLIENT_PORT: 32181
-  #     ZOOKEEPER_TICK_TIME: 2000
-  #     ZOOKEEPER_INIT_LIMIT: 5
-  #     ZOOKEEPER_SYNC_LIMIT: 2
-  #     ZOOKEEPER_SERVERS: zookeeper-1:22888:23888;zookeeper-2:32888:33888;zookeeper-3:42888:43888
-  #   ports:
-  #     - "32181:32181"
-  #     - "32888:32888"
-  #     - "33888:33888"
-
-  # zookeeper-3:
-  #   image: confluentinc/cp-zookeeper:latest
-  #   environment:
-  #     ZOOKEEPER_SERVER_ID: 3
-  #     ZOOKEEPER_CLIENT_PORT: 42181
-  #     ZOOKEEPER_TICK_TIME: 2000
-  #     ZOOKEEPER_INIT_LIMIT: 5
-  #     ZOOKEEPER_SYNC_LIMIT: 2
-  #     ZOOKEEPER_SERVERS: zookeeper-1:22888:23888;zookeeper-2:32888:33888;zookeeper-3:42888:43888
-  #   ports:
-  #     - "42181:42181"
-  #     - "42888:42888"
-  #     - "43888:43888"
-
-  # kafka-1:
-  #   image: confluentinc/cp-kafka:latest
-  #   depends_on:
-  #     - zookeeper-1
-  #     - zookeeper-2
-  #     - zookeeper-3
-  #   environment:
-  #     KAFKA_BROKER_ID: 1
-  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:22181,zookeeper-2:32181,zookeeper-3:42181
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:19092
-  #     KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092
-  #   ports:
-  #     - "19092:19092"
-
-  # kafka-2:
-  #   image: confluentinc/cp-kafka:latest
-  #   depends_on:
-  #     - zookeeper-1
-  #     - zookeeper-2
-  #     - zookeeper-3
-  #   environment:
-  #     KAFKA_BROKER_ID: 2
-  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:22181,zookeeper-2:32181,zookeeper-3:42181
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:29092
-  #     KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092
-  #   ports:
-  #     - "29092:29092"
-
-  # kafka-3:
-  #   image: confluentinc/cp-kafka:latest
-  #   depends_on:
-  #     - zookeeper-1
-  #     - zookeeper-2
-  #     - zookeeper-3
-  #   environment:
-  #     KAFKA_BROKER_ID: 3
-  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:22181,zookeeper-2:32181,zookeeper-3:42181
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:39092
-  #     KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:39092
-  #   ports:
-  #     - "39092:39092"
   kafka-1:
     image: confluentinc/cp-kafka:latest
+    container_name: kafka-1
     depends_on:
       - zookeeper
     environment:
@@ -101,9 +23,12 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092
     ports:
       - "19092:19092"
+    networks:
+      - bigdata
 
   kafka-2:
     image: confluentinc/cp-kafka:latest
+    container_name: kafka-2
     depends_on:
       - zookeeper
     environment:
@@ -113,9 +38,12 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092
     ports:
       - "29092:29092"
+    networks:
+      - bigdata
 
   kafka-3:
     image: confluentinc/cp-kafka:latest
+    container_name: kafka-3
     depends_on:
       - zookeeper
     environment:
@@ -125,13 +53,16 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:39092
     ports:
       - "39092:39092"
+    networks:
+      - bigdata
 
   spark-master:
-    image: bitnami/spark:latest
+    image: docker.io/bitnami/spark:3.4
     hostname: spark-master
     container_name: spark-master
     ports:
       - "8080:8080"
+      - "7077:7077"
     environment:
       - SPARK_MODE=master
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
@@ -140,9 +71,11 @@ services:
       - SPARK_SSL_ENABLED=no
     volumes:
       - ./spark-data:/bitnami
+    networks:
+      - bigdata
 
   spark-worker:
-    image: bitnami/spark:latest
+    image: docker.io/bitnami/spark:3.4
     hostname: spark-worker
     container_name: spark-worker
     depends_on:
@@ -152,10 +85,12 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=1G
-      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=8G
+      - SPARK_WORKER_CORES=8
     volumes:
       - ./spark-data:/bitnami
+    networks:
+      - bigdata
 
   redis:
     image: redis:latest
@@ -165,9 +100,15 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    networks:
+      - bigdata
 
 volumes:
   spark-data:
     driver: local
   redis-data:
     driver: local
+
+networks:
+  bigdata:
+    external: true

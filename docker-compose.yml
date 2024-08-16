@@ -25,6 +25,11 @@ services:
       - "19092:19092"
     networks:
       - bigdata
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka-1:19092", "--list"]
+      interval: 10s  # Check every 10 seconds
+      timeout: 5s   # Set a timeout for the command
+      retries: 5    # Retry up to 5 times before declaring unhealthy
 
   kafka-2:
     image: confluentinc/cp-kafka:latest
@@ -40,6 +45,11 @@ services:
       - "29092:29092"
     networks:
       - bigdata
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka-2:29092", "--list"]
+      interval: 10s  # Check every 10 seconds
+      timeout: 5s   # Set a timeout for the command
+      retries: 5    # Retry up to 5 times before declaring unhealthy
 
   kafka-3:
     image: confluentinc/cp-kafka:latest
@@ -55,6 +65,11 @@ services:
       - "39092:39092"
     networks:
       - bigdata
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka-3:39092", "--list"]
+      interval: 10s  # Check every 10 seconds
+      timeout: 5s   # Set a timeout for the command
+      retries: 5    # Retry up to 5 times before declaring unhealthy
 
   spark-master:
     image: docker.io/bitnami/spark:3.4
@@ -103,6 +118,60 @@ services:
     networks:
       - bigdata
 
+  myservice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ui
+    working_dir: /bdt/ui
+    entrypoint: ["python3", "app.py"]    
+    volumes:
+      - ./ui:/bdt/ui  # Mount the code directory
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    networks:
+      - bigdata
+
+  spark-streaming:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spark-streaming
+    working_dir: /bdt/spark_streaming
+    entrypoint: ["python3", "app.py"]
+    volumes:
+      - ./spark_streaming:/bdt/spark_streaming  # Mount the code directory
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    networks:
+      - bigdata
+
+  data-fetch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: data-fetch
+    working_dir: /bdt/data_fetch
+    entrypoint: ["python3", "fetch_air_quality_data.py"]
+    volumes:
+      - ./data_fetch:/bdt/data_fetch  # Mount the code directory
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    networks:
+      - bigdata
+
+
 volumes:
   spark-data:
     driver: local
@@ -111,4 +180,4 @@ volumes:
 
 networks:
   bigdata:
-    external: true
+    driver: bridge

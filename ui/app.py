@@ -114,11 +114,12 @@ load_dotenv()
 # Access environment variables
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
 WEREABLE_SIMULATOR_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
-HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')  # Second Kafka topic
+HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
 MUNICIPALITIES_AIR_QUALITY_UPDATE = os.getenv('MUNICIPALITIES_AIR_QUALITY_UPDATE')
 
+
 def get_recommendations():
-    
+
     # Initialize Kafka consumer
     consumer = KafkaConsumer(
         HEALTH_RECOMMENDATIONS_TOPIC,
@@ -156,6 +157,8 @@ def get_recommendations():
         consumer.close()
 
 def kafka_map_consumer():
+
+    print("lol")
     
     # Initialize Kafka consumer
     consumer = KafkaConsumer(
@@ -174,9 +177,8 @@ def kafka_map_consumer():
             
             generate_pollen_risk_map()
 
-            # Emit the updated map HTML to connected clients
-            # socketio.emit('updated_pollen_risk_map', {'updated_pollen_risk_map': updated_pollen_risk_map})
-            socketio.emit('update_map', {'message': 'Map updated'})
+            # Emit a message to the client
+            socketio.emit('updated_pollen_risk_map', {'message': 'Map updated'})
                 
     except Exception as e:
         print(f"Error in Kafka consumer: {str(e)}")
@@ -201,7 +203,7 @@ def start_simulation():
     while True:
         data = generate_data()
         # Send data to the client
-        emit('new_data', data)
+        socketio.emit('new_data', data)
         # Send data to Kafka
         publish_data(data)
         
@@ -217,4 +219,4 @@ def live_pollen_risk_map():
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True) # for development

@@ -1,10 +1,12 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, from_unixtime, col, mean, expr, udf, window, first
+from pyspark.sql.functions import from_json, from_unixtime, col, mean, expr, udf, window, first, count
 from pyspark.sql.types import StructType, StructField, StringType, FloatType, DoubleType, MapType, ArrayType
 from dotenv import load_dotenv
 import redis
 import os
 
+from kafka import KafkaAdminClient
+import time
 
 # Load environment variables from .env file
 load_dotenv()
@@ -12,7 +14,7 @@ load_dotenv()
 # Access environment variables
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
 KAFKA_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
-HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')  # Second Kafka topic
+HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
 REDIS_SERVER=os.getenv('REDIS_SERVER')
 REDIS_PORT=os.getenv('REDIS_PORT')
 
@@ -78,7 +80,6 @@ def fetch_pollen_levels(lat, lng):
     pollen_levels = get_pollen_levels(redis, municipality_id)
 
     if pollen_levels:
-        print("lol")
         return pollen_levels
     else:
         return "No data found"
@@ -150,6 +151,10 @@ def generate_recommendations(pollen_levels):
     
     return recommendations
 
+def check_topic_exists(topic_name, bootstrap_servers):
+    admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
+    topic_list = admin_client.list_topics()
+    return topic_name in topic_list
 
 def main():
 
@@ -170,12 +175,19 @@ def main():
     # Get Spark Session
     spark = initialize_spark_connection()
 
+    polling_interval = 5
+
+    while not check_topic_exists(KAFKA_TOPIC, KAFKA_BOOTSTRAP_SERVERS):
+        print(f"Topic {KAFKA_TOPIC} does not exist. Waiting...")
+        time.sleep(polling_interval)
+
     # Read data from Kafka
     kafka_df = spark \
     .readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
     .option("subscribe", KAFKA_TOPIC) \
+    .option("startingOffsets", "latest") \
     .load()
 
     # Deserialize JSON messages
@@ -188,48 +200,50 @@ def main():
     # Group by 1 minute windows + 30 second sliding
     # watermaeking of only 30 seconds because it doesnt make much sense to update results that arrive toolate
     windowed_df = parsed_df \
-        .withWatermark("timestamp", "2 minutes") \
-        .groupBy(window(col("timestamp"), "1 minutes", "30 seconds")) \
+        .withWatermark("timestamp", "1 seconds") \
+        .groupBy(window(col("timestamp"), "30 seconds")) \
         .agg(
             first("LAT").alias("LAT"),
             first("LNG").alias("LNG"),
             mean("EDA").alias("EDA_mean"),
             expr("sqrt(avg(ACC_X * ACC_X + ACC_Y * ACC_Y + ACC_Z * ACC_Z))").alias("ACC_magnitude_mean"),
             mean("TEMP").alias("TEMP_mean"),
-            mean("HRV").alias("HRV_mean")
+            mean("HRV").alias("HRV_mean"),
+            count(expr("*")).alias("count")
         ) 
 
-    # Add a pollen level
+    # Add pollen level
     windowed_df = windowed_df.withColumn("pollen_levels", fetch_pollen_levels(col("LAT"), col("LNG"))).drop("LAT", "LNG")
 
     # Finally get live recommendations
-    recommendations_df = windowed_df.withColumn("recommendation", generate_recommendations(col("pollen_levels"))).select("window", "recommendation")
+    recommendations_df = windowed_df.withColumn("recommendation", generate_recommendations(col("pollen_levels"))).select("window", "recommendation", "count")
     
     # Prepare the DataFrame with 'key' and 'value' columns for Kafka
-    # out_df = recommendations_df.selectExpr(
-    #     "CAST(window AS STRING) AS key",
-    #     "CAST(recommendation AS STRING) AS value"
-    # )
+    out_df = recommendations_df.selectExpr(
+        "CAST(unix_timestamp(window.end) AS STRING) AS key",
+        "CAST(count AS STRING) AS value"
+    )
 
-    # # Write the key-value pairs to the Kafka topic
-    # query = out_df.writeStream \
-    #     .outputMode("update") \
-    #     .format("kafka") \
-    #     .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
-    #     .option("topic", HEALTH_RECOMMENDATIONS_TOPIC) \
-    #     .option("checkpointLocation", "/pyspark/checkpoint/") \
-    #     .start()
+    # Write the key-value pairs to the Kafka topic
+    query = out_df.writeStream \
+    .outputMode("append") \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
+    .option("topic", HEALTH_RECOMMENDATIONS_TOPIC) \
+    .option("checkpointLocation", "/pyspark/checkpoint/") \
+    .trigger(processingTime="30 seconds") \
+    .start()
 
-    # query.awaitTermination()
+    query.awaitTermination()
 
 
     # Output in console
-    output_query = recommendations_df.writeStream \
-        .outputMode("update") \
-        .format("console") \
-        .start()
+    # output_query = recommendations_df.writeStream \
+    #     .outputMode("update") \
+    #     .format("console") \
+    #     .start()
 
-    output_query.awaitTermination()
+    # output_query.awaitTermination()
 
 
 if __name__ == "__main__":

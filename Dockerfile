@@ -15,11 +15,8 @@ RUN echo "export JAVA_PATH=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc
 RUN echo "export PATH=$PATH:$JAVA_HOME/bin" >> ~/.bashrc
 
 # Copy and install requirements
-COPY ../requirements.txt ./bdt_project/requirements.txt
-RUN  pip install -r ./bdt_project/requirements.txt
+COPY ./requirements.txt ./bdt/requirements.txt
+RUN  pip install -r ./bdt/requirements.txt
 
-#  Copy the package folder
-COPY data/ ./bdt_project/data
-COPY open_meteo_api_caller/ ./bdt_project/open_meteo_api_caller
-COPY pyspark/ ./bdt_project/pyspark
-COPY wereable_simulator/ ./bdt_project/wereable_simulator
+# Copy the package folder
+COPY . /bdt/

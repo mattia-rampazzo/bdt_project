@@ -15,10 +15,18 @@ load_dotenv()
 
 # Access environment variables
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
-KAFKA_TOPIC = os.getenv('OPEN_METEO_TOPIC')
+KAFKA_TOPIC = os.getenv('MUNICIPALITIES_AIR_QUALITY_UPDATE')
 REDIS_SERVER=os.getenv('REDIS_SERVER')
 REDIS_PORT=os.getenv('REDIS_PORT')
 
+
+def initialize_municipalities(redis_client, df_mun):
+
+    if not redis_client.exists('municipalities'):
+        # Create geospatial index
+        print("Creating municipalities geospatial index...")
+        for index, row in df_mun.iterrows():
+            redis_client.geoadd('municipalities', (row['lng'], row['lat'], f"municipality:{row['istat']}"))
 
 
 
@@ -112,16 +120,19 @@ def fetch_data(df_mun):
 
 def main():
     # Load municipalities data: ['istat', 'comune', 'lng', 'lat']
-    df_mun = pd.read_json(os.path.join("data", "trentino_municipalities.json"))
+    df_mun = pd.read_json(os.path.join("data", "Trentino-AltoAdige_municipalities.json"))
     # decomment to not waste too many apis
     # df_mun = df_mun.head(150) # 150 li tiene, di piu difficile, lurl dell api troppo grosso...
 
     # Setup redis and kafka
     redis_client = redis.Redis(host=REDIS_SERVER, port=REDIS_PORT, db=0)
+
     kafka_producer = KafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
+
+    initialize_municipalities(redis_client, df_mun)
 
     while True:
         try:

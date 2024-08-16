@@ -4,8 +4,15 @@ import random
 import json
 import pandas as pd
 
+import os
+from dotenv import load_dotenv
+
+REDIS_SERVER=os.getenv('REDIS_SERVER')
+REDIS_PORT=os.getenv('REDIS_PORT')
+
+
 def get_redis_connection():
-    return redis.Redis(host='localhost', port=6379, db=0)
+    return redis.Redis(host=REDIS_SERVER, port=REDIS_PORT, db=0)
 
 # Define the classify_pollen_concentration function
 def classify_pollen_concentration(pollen_type, concentration):
@@ -43,7 +50,7 @@ def get_pollen_risk_color(pollen_risk):
 def generate_pollen_risk_map():
  
     # Load the GeoJSON data
-    geojson_path = 'Trentino-AltoAdige_municipalities.geojson'
+    geojson_path = 'data/Trentino-AltoAdige_municipalities.geojson'
     with open(geojson_path) as f:
         geojson_data = json.load(f)
 

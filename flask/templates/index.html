@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Sillifier 3000 - Add New User</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">User Sillifier 3000</h1>
+        <p class="text-center">Add some silly users to the system!</p>
+        <form action="/" method="POST" class="mt-4">
+            <!-- Existing form fields -->
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" class="form-control"  value="Pippo" required>
+            </div>
+            <div class="form-group">
+                <label for="surname">Surname:</label>
+                <input type="text" id="surname" name="surname" class="form-control"  value="Franco" required>
+            </div>
+            <div class="form-group">
+                <label for="gender">Gender:</label>
+                <select id="gender" name="gender" class="form-control" required>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <!-- New form fields based on user_profile -->
+            <div class="form-group">
+                <label for="age">Age:</label>
+                <input type="number" id="age" name="age" class="form-control" value="30">
+            </div>
+            <div class="form-group">
+                <label for="height">Height (cm):</label>
+                <input type="number" id="height" name="Height_cm" class="form-control" value="175">
+            </div>
+            <div class="form-group">
+                <label for="weight">Weight (kg):</label>
+                <input type="number" id="weight" name="Weight_kg" class="form-control" value="70">
+            </div>            
+            <div class="form-group">
+                <label for="bmi">BMI :</label>
+                <input type="number" id="bmi" name="bmi" class="form-control" value="22.9">
+            </div>
+            <div class="form-group">
+                <label for="hypertension">Hypertension:</label>
+                <select id="hypertension" name="hypertension" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="heart_disease">Heart Disease:</label>
+                <select id="heart_disease" name="heart_disease" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="ever_married">Ever Married:</label>
+                <select id="ever_married" name="ever_married" class="form-control">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="work_type">Work Type:</label>
+                <select id="work_type" name="work_type" class="form-control">
+                    <option value="Private">Private</option>
+                    <option value="Self-employed">Self-employed</option>
+                    <option value="Government">Government</option>
+                    <option value="Children">Children</option>
+                    <option value="Never worked">Never worked</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="residence_type">Residence Type:</label>
+                <select id="residence_type" name="Residence_type" class="form-control">
+                    <option value="Urban">Urban</option>
+                    <option value="Rural">Rural</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="stroke">Stroke:</label>
+                <select id="stroke" name="stroke" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="current_smoker">Current Smoker:</label>
+                <select id="current_smoker" name="Current_Smoker" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="ex_smoker">Ex-Smoker:</label>
+                <select id="ex_smoker" name="EX_Smoker" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="obesity">Obesity:</label>
+                <select id="obesity" name="Obesity" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="cad">Coronary Artery Disease (CAD):</label>
+                <select id="cad" name="Cad" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="hay_fever">Hay Fever:</label>
+                <select id="hay_fever" name="Hay_Fever" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="asthma">Asthma:</label>
+                <select id="asthma" name="Asthma" class="form-control">
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+
+            <!-- Pollen-related fields using checkboxes -->
+            <div class="form-group">
+                <label>Pollen Allergies:</label><br>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="Birch_Pollen" value="1" id="birch_pollen" checked>
+                    <label class="form-check-label" for="birch_pollen">Birch Pollen</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="Ragweed_Pollen" value="1" id="ragweed_pollen">
+                    <label class="form-check-label" for="ragweed_pollen">Ragweed Pollen</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="Grass_Pollen" value="1" id="grass_pollen" checked>
+                    <label class="form-check-label" for="grass_pollen">Grass Pollen</label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Submit</button>
+        </form>
+    </div>
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

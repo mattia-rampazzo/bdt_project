@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Health Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">Real-Time Health Dashboard</h1>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="row">
+                    <div class="col-6">
+                        <h3>Electrodermal Activity (EDA)</h3>
+                        <p id="eda" class="lead">Waiting for data...</p>
+                    </div>
+                    <div class="col-6">
+                        <h3>Blood Volume Pulse (BVP)</h3>
+                        <p id="bvp" class="lead">Waiting for data...</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <h3>Temperature (TEMP)</h3>
+                        <p id="temp" class="lead">Waiting for data...</p>
+                    </div>
+                    <div class="col-6">
+                        <h3>Heart Rate Variability (HRV)</h3>
+                        <p id="hrv" class="lead">Waiting for data...</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <h3>Latitude (LAT)</h3>
+                        <p id="lat" class="lead">Waiting for data...</p>
+                    </div>
+                    <div class="col-6">
+                        <h3>Longitude (LNG)</h3>
+                        <p id="lng" class="lead">Waiting for data...</p>
+                    </div>
+                </div>
+
+                <button id="startButton" class="btn btn-primary mt-3">Start Simulation</button>
+                
+            </div>
+
+            
+
+            <div class="col-md-6">
+                <h3>Location Map</h3>
+                <!-- Embed the Folium map -->
+                <iframe id="mapIframe" src="/static/pollen_risk_map.html" width="100%" height="100%"></iframe>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col">
+                <h3>Recommendation</h3>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Recommendation</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recommendationTableBody">
+                        <tr>
+                            <td colspan="2">Waiting for data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        
+    </div>
+
+    <!-- jQuery and SocketIO -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.3/socket.io.min.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function(){
+            var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+            // Listen for map updates
+            socket.on('updated_pollen_risk_map', function(data) {
+                console.log('Map update received:', data);
+                $('#mapIframe').attr('src', $('#mapIframe').attr('src'));  // Reload the iframe
+            });
+
+            // Start sending data when the button is clicked
+            $('#startButton').click(function(){
+                socket.emit('start_simulation');
+            });
+
+            // Update the dashboard when new data is received
+            socket.on('new_data', function(data) {
+                $('#eda').text(data.EDA);
+                $('#bvp').text(data.BVP);
+                $('#temp').text(data.TEMP);
+                $('#hrv').text(data.HRV);
+                $('#lat').text(data.LAT);
+                $('#lng').text(data.LNG);
+            });
+
+            // Update the recommendation table with new data and keep only the last 5 entries
+            socket.on('new_recommendation', function(data) {
+                var recommendationsText = data.recommendations.join(', ');
+
+                var newRow = '<tr><td>' + data.time + '</td><td>' + recommendationsText + '</td></tr>';
+
+                $('#recommendationTableBody').prepend(newRow);
+
+                if ($('#recommendationTableBody tr').length > 5) {
+                    $('#recommendationTableBody tr:last').remove();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

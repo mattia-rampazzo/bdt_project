@@ -90,11 +90,10 @@
 import time
 from threading import Thread
 from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 
 
-from recommendations_service import generate_random_data, publish_data, get_recommendations
-from wereable_simulator import generate_data
+from wereable_simulator import WereableSimulator
 from map_generator import generate_pollen_risk_map
 
 
@@ -103,10 +102,11 @@ socketio = SocketIO(app)
 
 
 
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, KafkaProducer
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 import os
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -117,8 +117,25 @@ WEREABLE_SIMULATOR_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
 HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
 MUNICIPALITIES_AIR_QUALITY_UPDATE = os.getenv('MUNICIPALITIES_AIR_QUALITY_UPDATE')
 
+ws = WereableSimulator()
+is_simulation_running = False
 
-def get_recommendations():
+
+
+
+# Initialize Kafka producer
+producer = KafkaProducer(
+    bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+    value_serializer=lambda x: json.dumps(x).encode('utf-8')
+)
+
+def publish_data(data):
+
+    producer.send(WEREABLE_SIMULATOR_TOPIC, value=data)
+
+
+
+def kafka_recommendations_consumer():
 
     # Initialize Kafka consumer
     consumer = KafkaConsumer(
@@ -156,9 +173,8 @@ def get_recommendations():
     finally:
         consumer.close()
 
-def kafka_map_consumer():
 
-    print("lol")
+def kafka_map_consumer():
     
     # Initialize Kafka consumer
     consumer = KafkaConsumer(
@@ -192,29 +208,52 @@ def kafka_map_consumer():
 def index():
     return render_template('dashboard.html')
 
+
 @socketio.on('start_simulation')
 def start_simulation():
+    global is_simulation_running
 
-    # Launch a Thread to listen to HealthRecommendation topic
-    t = Thread(target=get_recommendations)
-    t.start()
+    is_simulation_running = True
 
     # Simulate wereable data
-    while True:
-        data = generate_data()
-        # Send data to the client
-        socketio.emit('new_data', data)
+    while is_simulation_running:
+        data = ws.generate_data()
         # Send data to Kafka
         publish_data(data)
+        # Send data to the client
+        socketio.emit('new_data', data)
+
         
         # Wait before sending the next data
         time.sleep(1)
+
+
+@socketio.on('stop_simulation')
+def stop_simulation():
+    global is_simulation_running
+    global ws
+
+    is_simulation_running = False
+    ws = WereableSimulator()
+
+
+@socketio.on('start_stress')
+def start_stress():
+    ws.set_stress(True)
+
+@socketio.on('start_illness')
+def start_illness():
+    ws.set_illness(True)
 
 
 @socketio.on('connect')
 def live_pollen_risk_map():
     # Launch a Thread to listen to HealthRecommendation topic
     t = Thread(target=kafka_map_consumer)
+    t.start()
+
+    # Launch a Thread to listen to HealthRecommendation topic
+    t = Thread(target=kafka_recommendations_consumer)
     t.start()
 
 

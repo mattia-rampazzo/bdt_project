@@ -119,6 +119,9 @@ def fetch_data(df_mun):
 
 
 def main():
+
+    time.sleep(30)  # Wait for 30 seconds before executing
+
     # Load municipalities data: ['istat', 'comune', 'lng', 'lat']
     df_mun = pd.read_json(os.path.join("data", "Trentino-AltoAdige_municipalities.json"))
     # decomment to not waste too many apis

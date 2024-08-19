@@ -1,12 +1,18 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, from_unixtime, col, mean, expr, udf, window, first, count
-from pyspark.sql.types import StructType, StructField, StringType, FloatType, DoubleType, MapType, ArrayType
+from pyspark.sql.functions import from_json, from_unixtime, col, avg, expr, udf, window, first, count, mean
+from pyspark.sql.types import StructType, StructField, IntegerType, FloatType, DoubleType, ArrayType, StringType
 from dotenv import load_dotenv
 import redis
+import json
 import os
+import uuid
 
 from kafka import KafkaAdminClient
 import time
+
+from cassandra.cluster import Cluster
+from cassandra.query import SimpleStatement, dict_factory
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,6 +23,8 @@ KAFKA_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
 HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
 REDIS_SERVER=os.getenv('REDIS_SERVER')
 REDIS_PORT=os.getenv('REDIS_PORT')
+
+
 
 def initialize_spark_connection():
     # Initialize Spark session
@@ -36,11 +44,128 @@ def initialize_redis_connection():
     # Initialize Redis
     return redis.Redis(host=REDIS_SERVER, port=REDIS_PORT, db=0)
 
+def initialize_cassandra_connection():
 
-def get_pollen_levels(redis, municipality_id):
+    cluster = Cluster(['cassandra'])
+
+    session = cluster.connect('bdt_keyspace')
+
+    # Set the row factory to return rows as dictionaries
+    session.row_factory = dict_factory
+
+    return session
+
+
+def check_topic_exists(topic_name, bootstrap_servers):
+    admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
+    topic_list = admin_client.list_topics()
+    return topic_name in topic_list
+
+def connect_to_kafka(spark):
+
+    polling_interval = 5
+
+    while not check_topic_exists(KAFKA_TOPIC, KAFKA_BOOTSTRAP_SERVERS):
+        print(f"Topic {KAFKA_TOPIC} does not exist. Waiting...")
+        time.sleep(polling_interval)
+
+
+    spark_df = None
+
+    # Read data from Kafka
+    try:
+        spark_df = spark \
+        .readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
+        .option("subscribe", KAFKA_TOPIC) \
+        .option("startingOffsets", "latest") \
+        .load()
+
+    except Exception as e:
+        print(f"kafka dataframe could not be created because: {e}")
+
+    return spark_df
+
+def parse_df(spark_df):
+
+    # Define the schema of the incoming data
+    schema = StructType([
+        StructField("heart_rate", FloatType(), True),
+        StructField("ibi", FloatType(), True),
+        StructField("eda", FloatType(), True),
+        StructField("skin_temp", FloatType(), True),
+        StructField("activity_level", FloatType(), True),
+        StructField("id", StringType(), True),
+        StructField("lat", FloatType(), True),
+        StructField("lng", FloatType(), True),
+        StructField("timestamp", DoubleType(), True)
+    ])
+
+    # Deserialize JSON messages
+    parsed_df = spark_df.select(from_json(col("value").cast("string"), schema).alias("parsed_value"))
+    # Flatten the struct
+    parsed_df = parsed_df.select("parsed_value.*")
+    # Parse unix to Spark timestamp
+    parsed_df = parsed_df.withColumn("timestamp", from_unixtime(col("timestamp")).cast("timestamp"))
+
+    return parsed_df
+
+
+def get_user_from_cache(r, user_id):
+
+    user_profile = r.get(f'user:{user_id}')
+    
+    if user_profile is None:
+        # Handle the case where no data is found
+        print("No data found for the given user_id.")
+        return
+    
+    # Decode byte data to string
+    user_profile = user_profile.decode('utf-8')
+
+    return json.loads(user_profile)
+
+
+def get_user_from_db(cassandra, user_id):
+    #uid = "7fb5c3da-0099-4516-8062-9e2e426487c1"
+    try:
+        # Create a parameterized query to prevent SQL injection
+        query = SimpleStatement("""
+            SELECT * 
+            FROM users 
+            WHERE user_id = %s
+        """)
+        
+        # Execute the query with the UUID parameter
+        result = cassandra.execute(query, (uuid.UUID("c6155cd0-d865-4265-af3a-dfb1102c1067"),))
+        
+        # Fetch and return the result
+        return result.one()
+    
+    except Exception as e:
+        # Handle any exceptions (e.g., connection issues, query errors)
+        print(f"An error occurred: {e}")
+        return None
+
+
+def get_user_profile(r, cassandra, user_id):
+    
+    user_data = get_user_from_cache(r, user_id)
+
+    if not user_data:
+        user_data = get_user_from_db(cassandra, user_id)
+        
+        # Store in Redis
+        user_data["user_id"] = user_id # json.dumps dont work with UUI
+        r.set(f'user:{user_id}', json.dumps(user_data))
+    
+    return user_data
+
+def get_pollen_levels(r, municipality_id):
     if municipality_id:
-        # return {"Birch": 12.5, "Oak": 15.3, "Ragweed": 8.9, "Grass": 5.0}
-        data =  redis.hgetall(municipality_id)
+        
+        data =  r.hgetall(municipality_id)
 
         pollen_keys = {
             'alder_pollen', 
@@ -57,7 +182,6 @@ def get_pollen_levels(redis, municipality_id):
             
         return data
 
-
 def get_closest_municipality_id(redis, lat, lng):
     closest = redis.georadius('municipalities', lng, lat, 10000, unit='km', withdist=True, count=1)
     if closest:
@@ -67,161 +191,112 @@ def get_closest_municipality_id(redis, lat, lng):
     else:
         return None    
 
-# Register UDF
-@udf(returnType=MapType(StringType(), FloatType()))
-def fetch_pollen_levels(lat, lng):
 
-    # Each worker initialize its redis connection
-    redis = initialize_redis_connection()
+def generate_recommendations(user_profile, pollen_levels, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_levels):
 
-    # here we should get the risk value associated with the locality instead of 
-    municipality_id = get_closest_municipality_id(redis, lat, lng)
-
-    pollen_levels = get_pollen_levels(redis, municipality_id)
-
-    if pollen_levels:
-        return pollen_levels
-    else:
-        return "No data found"
+    recommendations = []
+    # recommendations.append(user_profile["first_name"])
     
+    birch_pollen = float(pollen_levels.get('birch_pollen', 0.0))
+    ragweed_pollen = float(pollen_levels.get('ragweed_pollen', 0.0))
+    grass_pollen = float(pollen_levels.get('grass_pollen', 0.0))
+
+
+    # Heart Rate: Recommend action if heart rate exceeds 100 bpm.
+    # EDA (Stress): Suggest stress management if EDA exceeds 10 µS.
+    # Skin Temperature: Advise checking for fever if temperature exceeds 37°C.
+
+    # Recommendations based only on wearable data
+    if avg_eda > 10:
+        recommendations.append("Your stress levels seem high. Consider taking a break and practicing relaxation techniques.")
+
+    if avg_heart_rate > 100:
+        recommendations.append("Heart Rate: Recommend action if heart rate exceeds 100 bpm.")
+    
+    if avg_skin_temp > 37.5:
+        recommendations.append("Your body temperature is higher than normal. Monitor for symptoms of illness and consider consulting a healthcare provider.")
+
+    # Recommendations based on wearable data and pollen levels
+    # if user_profile.get('birch_pollen') is not None and birch_pollen > 0:
+    #     recommendations.append("Birch pollen levels are high. Consider staying indoors and taking preventive measures.")
+    # if user_profile.get('ragweed_pollen') is not None and ragweed_pollen > 0:
+    #     recommendations.append("Ragweed pollen levels are high. Consider staying indoors and taking preventive measures.")
+    # if user_profile.get('grass_pollen') is not None and grass_pollen > 0:
+    #     recommendations.append("Grass pollen levels are high. Consider staying indoors and taking preventive measures.")
+    
+    return recommendations
 
 
 # Register UDF
 @udf(returnType=ArrayType(StringType()))
-def generate_recommendations(pollen_levels):
+def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level):
 
-    # Example user profile
-    user_profile = {
-        'gender': 'Male',
-        'age': 30,
-        'Height_cm': 175,
-        'Weight_kg': 70,
-        'bmi': 22.9,
-        'hypertension': 0,
-        'heart_disease': 0,
-        'ever_married': 'Yes',
-        'work_type': 'Private',
-        'Residence_type': 'Urban',
-        'stroke': 0,
-        'Current Smoker': 0,
-        'EX-Smoker': 0,
-        'Obesity': 0,
-        'Cad': 0,
-        'Hay Fever': 1,
-        'Asthma': 0,
-        'Birch Pollen': 1,
-        'Ragweed Pollen': 0,
-        'Grass Pollen': 1,
-        'Oak Pollen': 0,
-        'Cedar Pollen': 0,
-        'Maple Pollen': 0,
-        'Pine Pollen': 0,
-        'Nettle Pollen': 0
-    }
+    # Each worker initialize its redism cassandra connection
+    r = initialize_redis_connection()
+    cassandra = initialize_cassandra_connection()
 
-    recommendations = []
+    # here we should get the risk value associated with the locality instead of 
+    municipality_id = get_closest_municipality_id(r, lat, lng)
 
-    # Extract wearable data and pollen levels from the dictionary
-    eda_mean = pollen_levels.get('eda_mean', 0.0)
-    acc_mean = pollen_levels.get('acc_mean', 0.0)
-    temp_mean = pollen_levels.get('temp_mean', 0.0)
-    hrv_mean = pollen_levels.get('hrv_mean', 0.0)
-    
-    birch_pollen = pollen_levels.get('Birch Pollen', 0.0)
-    ragweed_pollen = pollen_levels.get('Ragweed Pollen', 0.0)
-    grass_pollen = pollen_levels.get('Grass Pollen', 0.0)
+    pollen_levels = get_pollen_levels(r, municipality_id)
 
-    # Recommendations based only on wearable data
-    if eda_mean > 0.6:
-        recommendations.append("Your stress levels seem high. Consider taking a break and practicing relaxation techniques.")
-    if acc_mean < 0.1:
-        recommendations.append("You have been inactive for a while. Consider going for a short walk or doing some exercises.")
-    if temp_mean > 37.5:
-        recommendations.append("Your body temperature is higher than normal. Monitor for symptoms of illness and consider consulting a healthcare provider.")
-    if hrv_mean < 30:
-        recommendations.append("Your heart rate variability is low. Engage in activities that improve cardiovascular health such as regular exercise, adequate sleep, and stress management.")
-    
-    # Recommendations based on wearable data and pollen levels
-    if birch_pollen > 3 and user_profile['Birch Pollen']:
-        recommendations.append("Birch pollen levels are high. Consider staying indoors and taking preventive measures.")
-    if ragweed_pollen > 3 and user_profile['Ragweed Pollen']:
-        recommendations.append("Ragweed pollen levels are high. Consider staying indoors and taking preventive measures.")
-    if grass_pollen > 3 and user_profile['Grass Pollen']:
-        recommendations.append("Grass pollen levels are high. Consider staying indoors and taking preventive measures.")
-    
+    user_profile = get_user_profile(r, cassandra, user_id)
+
+    recommendations = generate_recommendations(user_profile, pollen_levels, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level)
+
     return recommendations
 
-def check_topic_exists(topic_name, bootstrap_servers):
-    admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
-    topic_list = admin_client.list_topics()
-    return topic_name in topic_list
+
 
 def main():
-
-    # Define schema for the JSON data
-    schema = StructType([
-        StructField("EDA", FloatType(), True),
-        StructField("BVP", FloatType(), True),
-        StructField("ACC_X", FloatType(), True),
-        StructField("ACC_Y", FloatType(), True),
-        StructField("ACC_Z", FloatType(), True),
-        StructField("TEMP", FloatType(), True),
-        StructField("HRV", FloatType(), True),
-        StructField("LAT", FloatType(), True),
-        StructField("LNG", FloatType(), True),
-        StructField("timestamp", DoubleType(), True)
-    ])
 
     # Get Spark Session
     spark = initialize_spark_connection()
 
-    polling_interval = 5
-
-    while not check_topic_exists(KAFKA_TOPIC, KAFKA_BOOTSTRAP_SERVERS):
-        print(f"Topic {KAFKA_TOPIC} does not exist. Waiting...")
-        time.sleep(polling_interval)
-
     # Read data from Kafka
-    kafka_df = spark \
-    .readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
-    .option("subscribe", KAFKA_TOPIC) \
-    .option("startingOffsets", "latest") \
-    .load()
+    spark_df = connect_to_kafka(spark)
 
-    # Deserialize JSON messages
-    parsed_df = kafka_df.select(from_json(col("value").cast("string"), schema).alias("parsed_value"))
-    # Flatten the struct
-    parsed_df = parsed_df.select("parsed_value.*")
-    # Parse unix to Spark timestamp
-    parsed_df = parsed_df.withColumn("timestamp", from_unixtime(col("timestamp")).cast("timestamp"))
+    # Parsing
+    parsed_df = parse_df(spark_df)
 
+
+    
     # Group by 1 minute windows + 30 second sliding
     # watermaeking of only 30 seconds because it doesnt make much sense to update results that arrive toolate
     windowed_df = parsed_df \
-        .withWatermark("timestamp", "1 seconds") \
-        .groupBy(window(col("timestamp"), "30 seconds")) \
+        .withWatermark("timestamp", "1  seconds") \
+        .groupBy(
+            window(col("timestamp"), "1 minutes")  # Time window of 30 seconds
+        ) \
         .agg(
-            first("LAT").alias("LAT"),
-            first("LNG").alias("LNG"),
-            mean("EDA").alias("EDA_mean"),
-            expr("sqrt(avg(ACC_X * ACC_X + ACC_Y * ACC_Y + ACC_Z * ACC_Z))").alias("ACC_magnitude_mean"),
-            mean("TEMP").alias("TEMP_mean"),
-            mean("HRV").alias("HRV_mean"),
+            first("id").alias("id"), # should be in agg but whatever
+            first("lat").alias("lat"),
+            first("lng").alias("lng"),
+            mean("heart_rate").alias("avg_heart_rate"),
+            mean("eda").alias("avg_eda"),
+            mean("skin_temp").alias("avg_skin_temp"),
+            mean("activity_level").alias("avg_activity_level"),
             count(expr("*")).alias("count")
         ) 
 
+    # windowed_df.writeStream \
+    # .outputMode("append") \
+    # .format("console") \
+    # .option("truncate", "false") \
+    # .trigger(processingTime="30 seconds") \
+    # .start() \
+    # .awaitTermination()
+
     # Add pollen level
-    windowed_df = windowed_df.withColumn("pollen_levels", fetch_pollen_levels(col("LAT"), col("LNG"))).drop("LAT", "LNG")
+    # windowed_df = windowed_df.withColumn("pollen_levels", fetch_pollen_levels().drop("LAT", "LNG")
 
     # Finally get live recommendations
-    recommendations_df = windowed_df.withColumn("recommendation", generate_recommendations(col("pollen_levels"))).select("window", "recommendation", "count")
+    recommendations_df = windowed_df.withColumn("recommendations", get_recommendations(col("id"), col("lat"), col("lng"), col("avg_heart_rate"), col("avg_eda"), col("avg_skin_temp"), col("avg_activity_level") )).select("window", "recommendations", "count")
     
     # Prepare the DataFrame with 'key' and 'value' columns for Kafka
     out_df = recommendations_df.selectExpr(
         "CAST(unix_timestamp(window.end) AS STRING) AS key",
-        "CAST(count AS STRING) AS value"
+        "CAST(recommendations AS STRING) AS value"
     )
 
     # Write the key-value pairs to the Kafka topic
@@ -231,7 +306,7 @@ def main():
     .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
     .option("topic", HEALTH_RECOMMENDATIONS_TOPIC) \
     .option("checkpointLocation", "/pyspark/checkpoint/") \
-    .trigger(processingTime="30 seconds") \
+    .trigger(processingTime="1 minutes") \
     .start()
 
     query.awaitTermination()

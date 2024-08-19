@@ -1,78 +1,94 @@
-import os
-import json
+import random
 import time
-import numpy as np
-import pandas as pd
-from kafka import KafkaProducer
-from dotenv import load_dotenv
+
+class WereableSimulator:
+    def __init__(self, stress=False, illness = False, normal = True, individual_id="c6155cd0-d865-4265-af3a-dfb1102c1067", lat=46.215179, lng=11.119681):
+        self.stress = stress
+        self.illness = True
+        self.normal = normal
+        self.individual_id = individual_id
+        self.lat = lat
+        self.lng = lng
+        self.data = {
+            'heart_rate': 70,
+            'ibi': 1000 / 70,
+            'eda': 5,
+            'skin_temp': 33,
+            'activity_level': 0
+        }
+
+    def _update_data(self):
+        # Update heart_rate with some variability
+        previous_data = self.data.copy()
+
+        # Update heart_rate with a small random variation
+        self.data['heart_rate'] = round(previous_data['heart_rate'] + random.uniform(-5, 5), 2)
+
+        # Update ibi based on the new heart_rate
+        self.data['ibi'] = round(1000 / self.data['heart_rate'], 2)
+
+        # Update eda with a small random variation
+        self.data['eda'] = round(previous_data['eda'] + random.uniform(-1, 1), 2)
+        
+        # Update skin_temp with a small random variation
+        self.data['skin_temp'] = round(previous_data['skin_temp'] + random.uniform(-0.5, 0.5), 2)
+
+        # Update activity_level with a small random variation
+        self.data['activity_level'] = round(previous_data['activity_level'] + random.uniform(-0.05, 0.05), 2)
+
+        if self.normal:
+            # ensure normal values
+            self.data['eda'] = max(1, min(10, self.data['eda']))
+            self.data['heart_rate'] = max(60, min(100, self.data['heart_rate']))
+            self.data['skin_temp'] = max(30, min(37, self.data['skin_temp']))
+            self.data['activity_level'] = max(0, min(1, self.data['activity_level']))
+
+        
+
+    def _simulate_stress_increase(self, stress_level):
+
+        # Increase heart rate with stress
+        self.data['heart_rate'] += stress_level * random.uniform(5, 15)
+        self.data['ibi'] = 1000 / self.data['heart_rate']
+
+        # Increase EDA with stress
+        self.data['eda'] = 12
+
+        # Increase skin temperature slightly with stress
+        self.data['skin_temp'] += stress_level * random.uniform(0.1, 0.3)
+
+        # Increase activity level slightly
+        self.data['activity_level'] += stress_level * random.uniform(0.05, 0.1)
+
+    def _simulate_illness(self):
+
+        # Increase heart rate with stress
+        self.data['skin_temp'] =  random.uniform(37.5, 40)
 
 
+    def set_stress(self, stress):
+        self.stress = stress
+        self.normal = not stress
 
-def generate_eda(length=1, baseline=0.5, noise_level=0.01, spike_prob=0.01):
-    eda = np.ones(length) * baseline
-    spikes = np.random.rand(length) < spike_prob
-    eda[spikes] += np.random.rand(np.sum(spikes)) * 0.5
-    eda += np.random.randn(length) * noise_level
-    return eda
+    def set_illness(self, illness):
+        self.illness = illness
+        self.normal = not illness
 
-def generate_bvp(length=1, hr_mean=60, hr_std=1, noise_level=0.01):
-    hr = np.random.normal(hr_mean, hr_std, length)
-    ibi = 60 / hr
-    bvp = np.sin(np.cumsum(ibi) * 2 * np.pi / ibi.mean())
-    bvp += np.random.randn(length) * noise_level
-    return bvp
+    def generate_data(self):
 
-def generate_acc(length=1, noise_level=0.01, burst_prob=0.01):
-    acc = np.random.randn(length, 3) * noise_level
-    bursts = np.random.rand(length) < burst_prob
-    acc[bursts] += np.random.randn(np.sum(bursts), 3) * 10
-    return acc
+        if self.stress:
+            self._simulate_stress_increase(stress_level=1)
+            self.stress = False
 
-def generate_temp(length=1, baseline=33.0, noise_level=0.1):
-    temp = np.ones(length) * baseline
-    temp += np.cumsum(np.random.randn(length) * noise_level)
-    return temp
+        if self.illness:
+            self._simulate_illness()
+            self.illness = False
+        self._update_data()
+        
+        # Add location and ID information
+        self.data["id"] = self.individual_id
+        self.data["lat"] = self.lat
+        self.data["lng"] = self.lng
+        self.data["timestamp"] = time.time()
 
-def generate_hrv(length=1, baseline=60, noise_level=5):
-    hr = baseline + np.random.randn(length) * noise_level
-    ibi = 60 / hr
-    hrv = np.std(ibi)
-    return hrv
-
-# http://bboxfinder.com/#45.708406,10.458984,47.026592,12.319336
-def generate_gps_coordinates():
-    # Generate random GPS coordinates within a specific range
-    lat = np.random.uniform(45.7, 47)
-    lng = np.random.uniform(10.5, 12)
-    return lat, lng
-
-def send_data_to_kafka(producer, topic, data):
-    producer.send(topic, value=data)
-    producer.flush()
-
-lat, lng = generate_gps_coordinates()
-lat, lng = 46.215179, 11.119681 # Mezzocorona
-
-
-def generate_data():
-
-    eda = generate_eda()[0]
-    bvp = generate_bvp()[0]
-    acc = generate_acc()[0]
-    temp = generate_temp()[0]
-    hrv = generate_hrv()
-
-    data = {
-        'EDA': eda,
-        'BVP': bvp,
-        'ACC_X': acc[0],
-        'ACC_Y': acc[1],
-        'ACC_Z': acc[2],
-        'TEMP': temp,
-        'HRV': hrv,
-        "LAT": lat,
-        "LNG": lng,
-        "timestamp": time.time()
-    }
-
-    return data
+        return self.data

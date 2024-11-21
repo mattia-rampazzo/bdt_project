@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Health Dashboard</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        .card {
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .card-header {
+            background-color: #007bff;
+            color: #ffffff;
+            font-size: 1.25rem;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .table th, .table td {
+            text-align: center;
+            vertical-align: middle;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #004085;
+        }
+        iframe {
+            border: none;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Real-Time Health Dashboard</h1>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Health Metrics</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <label>Heart Rate (bpm)</label>
+                                <p id="heart_rate" class="lead">-</p>
+                            </div>
+                            <div class="col-6">
+                                <label>IBI (ms)</label>
+                                <p id="ibi" class="lead">-</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <label>EDA (µS)</label>
+                                <p id="eda" class="lead">-</p>
+                            </div>
+                            <div class="col-6">
+                                <label>Skin Temperature (°C)</label>
+                                <p id="skin_temp" class="lead">-</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <label>Activity Level</label>
+                                <p id="activity_level" class="lead">-</p>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-6">
+                                <button id="startButton" class="btn btn-primary mt-3">Start</button>
+                                <button id="stopButton" class="btn btn-danger mt-3 d-none">Reset</button>
+                            </div>
+
+                            <div class="col-6">
+                                <button id="startStress" class="btn btn-secondary mt-3 d-none">Stress</button>
+
+                                <button id="startIllness" class="btn btn-secondary mt-3 d-none">Illness</button>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Live Pollen Map</div>
+                    <div class="card-body">
+                        <iframe id="mapIframe" src="/static/pollen_risk_map.html" width="100%" height="400px"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">Live Recommendations</div>
+                    <div class="card-body">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Recommendation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recommendationTableBody">
+                                <tr>
+                                    <td colspan="2">Waiting for data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <!-- jQuery and SocketIO -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.3/socket.io.min.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <script type="text/javascript">
+        $(document).ready(function(){
+            var socket = io.connect('http://' + document.domain + ':' + location.port);
+            var isSimulationRunning = false;
+
+            // Listen for messages from the iframe
+            window.addEventListener('message', function(event) {
+                console.log('Message received from iframe:', event.data);  // Debugging
+                if (event.data && event.data.lat !== undefined && event.data.lon !== undefined) {
+                    // Update the lat-lon display
+                    window.alert("click")
+                }
+            });
+
+            // Listen for map updates
+            socket.on('updated_pollen_risk_map', function(data) {
+                console.log('Map update received:', data);
+                window.alert("Map update received:")
+                $('#mapIframe').attr('src', $('#mapIframe').attr('src'));  // Reload the iframe
+            });
+
+            // Start sending data when the button is clicked
+            $('#startButton').click(function(){
+                if (!isSimulationRunning) {
+                    socket.emit('start_simulation');
+                    $('#startButton').addClass('d-none');
+                    $('#stopButton').removeClass('d-none');
+                    $('#startStress').removeClass('d-none');
+                    $('#startIllness').removeClass('d-none');
+                    isSimulationRunning = true;
+                }
+            });
+
+            $('#stopButton').click(function(){
+                if (isSimulationRunning) {
+                    socket.emit('stop_simulation');  // Assuming you have this event to stop the simulation
+                    $('#stopButton').addClass('d-none');
+                    $('#startButton').removeClass('d-none');
+                    $('#startStress').addClass('d-none');
+                    $('#startIllness').addClass('d-none');
+                    isSimulationRunning = false;
+                }
+            });
+
+            // Start stress simulation
+            $('#startStress').click(function(){
+                if (isSimulationRunning) {
+                    socket.emit('start_stress');
+                }
+            });
+
+            // Start illness simulation
+            $('#startIllness').click(function(){
+                if (isSimulationRunning) {
+                    socket.emit('start_illness');
+                }
+            });
+
+            // Update the dashboard when new data is received
+            socket.on('new_data', function(data) {
+                $('#heart_rate').text(data.heart_rate);
+                $('#ibi').text(data.ibi);
+                $('#skin_temp').text(data.skin_temp);
+                $('#eda').text(data.eda);
+                $('#activity_level').text(data.activity_level);
+            });
+
+            // Update the recommendation table with new data and keep only the last 5 entries
+            socket.on('new_recommendation', function(data) {
+
+                var recommendationsText = data.recommendations.join('<br>');
+
+                var newRow = '<tr><td>' + data.time + '</td><td>' + recommendationsText + '</td></tr>';
+
+                $('#recommendationTableBody').prepend(newRow);
+
+                if ($('#recommendationTableBody tr').length > 5) {
+                    $('#recommendationTableBody tr:last').remove();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

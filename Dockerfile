@@ -10,6 +10,12 @@ RUN apt-get -y install python3.11 python3-pip
 # Install Java (JDK)
 RUN apt-get install -y openjdk-11-jdk
 
+# Set the working directory inside the container
+# WORKDIR /bdt/dashboard
+
+# Set the PYTHONPATH to the root of your project (the top-level directory)
+ENV PYTHONPATH="/bdt:${PYTHONPATH}"
+
 # Initializing docker's bashrc
 RUN echo "export JAVA_PATH=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc
 RUN echo "export PATH=$PATH:$JAVA_HOME/bin" >> ~/.bashrc

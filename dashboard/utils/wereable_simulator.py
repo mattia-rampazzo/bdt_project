@@ -2,7 +2,7 @@ import random
 import time
 
 class WereableSimulator:
-    def __init__(self, stress=False, illness = False, normal = True, individual_id="c6155cd0-d865-4265-af3a-dfb1102c1067", lat=46.215179, lng=11.119681):
+    def __init__(self, stress=False, illness = False, normal = True, individual_id="f72f5a88-30bd-46ce-97ee-63ac7528155e", lat=46.215179, lng=11.119681):
         self.stress = stress
         self.illness = True
         self.normal = normal

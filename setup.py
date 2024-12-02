@@ -2,9 +2,11 @@ from kafka import KafkaAdminClient
 from kafka.admin import NewTopic
 import time
 import os
+import uuid
 import pandas as pd
 
 from services.redis_client import RedisClient
+from services.cassandra_client import CassandraClient
 
 from dotenv import load_dotenv
 
@@ -13,13 +15,18 @@ load_dotenv()
 
 # Access environment variables
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
-MUNICIPALITIES_AIR_QUALITY_UPDATE = os.getenv('MUNICIPALITIES_AIR_QUALITY_UPDATE')
+AIR_QUALITY_TOPIC = os.getenv('AIR_QUALITY_TOPIC')
 WEREABLE_SIMULATOR_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
 HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
 
+
+# Cassandra environment variables
+CASSANDRA_CLUSTER = os.getenv('CASSANDRA_CLUSTER')
+CASSANDRA_KEYSPACE = os.getenv('CASSANDRA_KEYSPACE')
+
 # Define list of topics
 TOPICS = [
-    NewTopic(MUNICIPALITIES_AIR_QUALITY_UPDATE, num_partitions=3, replication_factor=1),
+    NewTopic(AIR_QUALITY_TOPIC, num_partitions=3, replication_factor=1),
     NewTopic(WEREABLE_SIMULATOR_TOPIC, num_partitions=3, replication_factor=1),
     NewTopic(HEALTH_RECOMMENDATIONS_TOPIC, num_partitions=3, replication_factor=1),
 ]
@@ -73,22 +80,31 @@ def setup_redis():
     initialize_municipalities(r, df_mun)
 
 
+def setup_cassandra():
+    # Connect to a cluster in a session
+    cassandra = CassandraClient(CASSANDRA_CLUSTER)
+    
+    cassandra.create_table_user()
 
+    cassandra.add_user({
+        'user_id': uuid.uuid4(), 
+        'username': "pearl",
+        'email': "at com"
+    })
+
+    # Close the session and cluster connection
+    cassandra.shutdown()
 
 if __name__ == "__main__":
 
     print("Settitng up Redis")
-
     setup_redis()
+    print("Redis ok")
 
-    print("rEDIS oK")
-    # setup_cassandra()
+    print("Settitng up Cassandra")
+    setup_cassandra()
+    print("Cassandra ok")
 
     print("Settitng up Kafka")
     setup_kafka()
-    
-    print("cass")
-    print()
-
-
-
+    print("Kafka ok")

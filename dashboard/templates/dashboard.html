@@ -173,6 +173,7 @@
             // Start sending data when the button is clicked
             $('#startButton').click(function(){
                 if (!isSimulationRunning) {
+                    // console.log("Button Clicked")
                     socket.emit('start_simulation');
                     $('#startButton').addClass('d-none');
                     $('#stopButton').removeClass('d-none');
@@ -218,10 +219,13 @@
 
             // Update the recommendation table with new data and keep only the last 5 entries
             socket.on('new_recommendation', function(data) {
-
+                
                 var recommendationsText = data.recommendations.join('<br>');
+                // console.log(data.timestamp)
+                var date = new Date(data.timestamp * 1000);
+                //var formattedDate = new Intl.DateTimeFormat().format(date);
 
-                var newRow = '<tr><td>' + data.time + '</td><td>' + recommendationsText + '</td></tr>';
+                var newRow = '<tr><td>' + date.toLocaleString() + '</td><td>' + recommendationsText + '</td></tr>';
 
                 $('#recommendationTableBody').prepend(newRow);
 

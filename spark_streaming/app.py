@@ -2,16 +2,15 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, from_unixtime, col, avg, expr, udf, window, first, count, mean
 from pyspark.sql.types import StructType, StructField, IntegerType, FloatType, DoubleType, ArrayType, StringType
 from dotenv import load_dotenv
-import redis
-import json
-import os
 import uuid
+import time
+import os
 
 from kafka import KafkaAdminClient
-import time
 
-from cassandra.cluster import Cluster
-from cassandra.query import SimpleStatement, dict_factory
+from services.redis_client import RedisClient
+from services.cassandra_client import CassandraClient
+
 
 
 # Load environment variables from .env file
@@ -28,32 +27,21 @@ REDIS_PORT=os.getenv('REDIS_PORT')
 
 def initialize_spark_connection():
     # Initialize Spark session
-    spark =  SparkSession.builder \
+    spark = SparkSession.builder \
         .appName("BigData") \
         .master("local[*]") \
-        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0") \
+        .config("spark.jars.packages", 
+                "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,"  # Kafka, Cassandra connector
+                "com.datastax.spark:spark-cassandra-connector_2.12:3.0.0")  \
+        .config("spark.cassandra.connection.host", "cassandra") \
+        .config("spark.cassandra.connection.port", "9042") \
         .getOrCreate()
     #   .master("spark://localhost:7077") \
 
     # Set log level to WARN to reduce verbosity, avoiding log info in console
-    spark.sparkContext.setLogLevel("WARN")
+    spark.sparkContext.setLogLevel("ERROR")
 
     return spark
-
-def initialize_redis_connection():
-    # Initialize Redis
-    return redis.Redis(host=REDIS_SERVER, port=REDIS_PORT, db=0)
-
-def initialize_cassandra_connection():
-
-    cluster = Cluster(['cassandra'])
-
-    session = cluster.connect('bdt_keyspace')
-
-    # Set the row factory to return rows as dictionaries
-    session.row_factory = dict_factory
-
-    return session
 
 
 def check_topic_exists(topic_name, bootstrap_servers):
@@ -111,97 +99,44 @@ def parse_df(spark_df):
 
     return parsed_df
 
+def get_user_profile(user_id):
 
-def get_user_from_cache(r, user_id):
-
-    user_profile = r.get(f'user:{user_id}')
-    
-    if user_profile is None:
-        # Handle the case where no data is found
-        print("No data found for the given user_id.")
-        return
-    
-    # Decode byte data to string
-    user_profile = user_profile.decode('utf-8')
-
-    return json.loads(user_profile)
-
-
-def get_user_from_db(cassandra, user_id):
-    #uid = "7fb5c3da-0099-4516-8062-9e2e426487c1"
-    try:
-        # Create a parameterized query to prevent SQL injection
-        query = SimpleStatement("""
-            SELECT * 
-            FROM users 
-            WHERE user_id = %s
-        """)
-        
-        # Execute the query with the UUID parameter
-        result = cassandra.execute(query, (uuid.UUID("c6155cd0-d865-4265-af3a-dfb1102c1067"),))
-        
-        # Fetch and return the result
-        return result.one()
-    
-    except Exception as e:
-        # Handle any exceptions (e.g., connection issues, query errors)
-        print(f"An error occurred: {e}")
-        return None
-
-
-def get_user_profile(r, cassandra, user_id):
-    
-    user_data = get_user_from_cache(r, user_id)
-
-    if not user_data:
-        user_data = get_user_from_db(cassandra, user_id)
-        
-        # Store in Redis
-        user_data["user_id"] = user_id # json.dumps dont work with UUI
-        r.set(f'user:{user_id}', json.dumps(user_data))
+    # Get user from Cassandra
+    cassandra = CassandraClient()
+    user_data = cassandra.get_user(uuid.UUID(user_id))
+    cassandra.shutdown()
     
     return user_data
 
-def get_pollen_levels(r, municipality_id):
-    if municipality_id:
-        
-        data =  r.hgetall(municipality_id)
+def write_to_console(spark_df):
+    # Output in console for debugging
+    query = spark_df.writeStream \
+        .outputMode("complete") \
+        .format("console") \
+        .trigger(processingTime="1 minutes") \
+        .start()
 
-        pollen_keys = {
-            'alder_pollen', 
-            'birch_pollen', 
-            'grass_pollen', 
-            'mugwort_pollen', 
-            'olive_pollen', 
-            'ragweed_pollen', 
-            'temperature_2m'
-        }
+    query.awaitTermination()
 
-        # Decode keys and values from bytes to strings
-        data = {k.decode('utf-8'): v.decode('utf-8') for k, v in data.items() if k.decode('utf-8') in pollen_keys}
-            
-        return data
+def write_to_kafka(spark_df):
+    query = spark_df.writeStream \
+    .outputMode("complete") \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
+    .option("topic", HEALTH_RECOMMENDATIONS_TOPIC) \
+    .option("checkpointLocation", "/pyspark/checkpoint/") \
+    .trigger(processingTime="1 minutes") \
+    .start()
 
-def get_closest_municipality_id(redis, lat, lng):
-    closest = redis.georadius('municipalities', lng, lat, 10000, unit='km', withdist=True, count=1)
-    if closest:
-        municipality_id = closest[0][0].decode('utf-8')
-        # distance = closest[0][1]
-        return municipality_id
-    else:
-        return None    
+    query.awaitTermination()
 
-
-def generate_recommendations(user_profile, pollen_levels, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_levels):
+def generate_recommendations(user_data, municipality_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_levels):
 
     recommendations = []
-    # recommendations.append(user_profile["first_name"])
+
+    print(f"User name: {user_data['username']}" )    
+    print(f"Pollen levels: {municipality_data['grass_pollen']}")
     
-    birch_pollen = float(pollen_levels.get('birch_pollen', 0.0))
-    ragweed_pollen = float(pollen_levels.get('ragweed_pollen', 0.0))
-    grass_pollen = float(pollen_levels.get('grass_pollen', 0.0))
-
-
     # Heart Rate: Recommend action if heart rate exceeds 100 bpm.
     # EDA (Stress): Suggest stress management if EDA exceeds 10 µS.
     # Skin Temperature: Advise checking for fever if temperature exceeds 37°C.
@@ -223,7 +158,8 @@ def generate_recommendations(user_profile, pollen_levels, avg_heart_rate, avg_ed
     #     recommendations.append("Ragweed pollen levels are high. Consider staying indoors and taking preventive measures.")
     # if user_profile.get('grass_pollen') is not None and grass_pollen > 0:
     #     recommendations.append("Grass pollen levels are high. Consider staying indoors and taking preventive measures.")
-    
+    recommendations.append(f"User name: {user_data['username']}" )
+
     return recommendations
 
 
@@ -231,20 +167,26 @@ def generate_recommendations(user_profile, pollen_levels, avg_heart_rate, avg_ed
 @udf(returnType=ArrayType(StringType()))
 def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level):
 
-    # Each worker initialize its redism cassandra connection
-    r = initialize_redis_connection()
-    cassandra = initialize_cassandra_connection()
+    # Initialize Redis connection
+    r = RedisClient()
 
-    # here we should get the risk value associated with the locality instead of 
-    municipality_id = get_closest_municipality_id(r, lat, lng)
+    # Look in Redis for data we need
+    municipality_id = r.get_closest_municipality(lng, lat, 10000)
+    municipality_data = r.hgetall(municipality_id)
+    user_data = r.get(f'user:{user_id}')
+    
 
-    pollen_levels = get_pollen_levels(r, municipality_id)
+    if not user_data:
+        # Look in Cassandra
+        get_user_profile(user_id)
+        user_data["user_id"] = user_id # json.dumps dont work with UUI
+        # Store in Redis
+        r.set(f'user:{user_id}', user_data)
 
-    user_profile = get_user_profile(r, cassandra, user_id)
+    # Close Connection
+    r.close()
 
-    recommendations = generate_recommendations(user_profile, pollen_levels, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level)
-
-    return recommendations
+    return generate_recommendations(user_data, municipality_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level)
 
 
 
@@ -259,17 +201,15 @@ def main():
     # Parsing
     parsed_df = parse_df(spark_df)
 
-
-    
-    # Group by 1 minute windows + 30 second sliding
-    # watermaeking of only 30 seconds because it doesnt make much sense to update results that arrive toolate
+    # Group by 1 minute windows
+    # watermaeking of only 1 seconds because it doesnt make much sense to update results that arrive toolate
     windowed_df = parsed_df \
-        .withWatermark("timestamp", "1  seconds") \
+        .withWatermark("timestamp", "0  seconds") \
         .groupBy(
             window(col("timestamp"), "1 minutes")  # Time window of 30 seconds
         ) \
         .agg(
-            first("id").alias("id"), # should be in agg but whatever
+            first("id").alias("id"),
             first("lat").alias("lat"),
             first("lng").alias("lng"),
             mean("heart_rate").alias("avg_heart_rate"),
@@ -277,18 +217,7 @@ def main():
             mean("skin_temp").alias("avg_skin_temp"),
             mean("activity_level").alias("avg_activity_level"),
             count(expr("*")).alias("count")
-        ) 
-
-    # windowed_df.writeStream \
-    # .outputMode("append") \
-    # .format("console") \
-    # .option("truncate", "false") \
-    # .trigger(processingTime="30 seconds") \
-    # .start() \
-    # .awaitTermination()
-
-    # Add pollen level
-    # windowed_df = windowed_df.withColumn("pollen_levels", fetch_pollen_levels().drop("LAT", "LNG")
+        )
 
     # Finally get live recommendations
     recommendations_df = windowed_df.withColumn("recommendations", get_recommendations(col("id"), col("lat"), col("lng"), col("avg_heart_rate"), col("avg_eda"), col("avg_skin_temp"), col("avg_activity_level") )).select("window", "recommendations", "count")
@@ -300,25 +229,9 @@ def main():
     )
 
     # Write the key-value pairs to the Kafka topic
-    query = out_df.writeStream \
-    .outputMode("append") \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
-    .option("topic", HEALTH_RECOMMENDATIONS_TOPIC) \
-    .option("checkpointLocation", "/pyspark/checkpoint/") \
-    .trigger(processingTime="1 minutes") \
-    .start()
+    write_to_kafka(out_df)
 
-    query.awaitTermination()
-
-
-    # Output in console
-    # output_query = recommendations_df.writeStream \
-    #     .outputMode("update") \
-    #     .format("console") \
-    #     .start()
-
-    # output_query.awaitTermination()
+    # write_to_console(out_df)
 
 
 if __name__ == "__main__":

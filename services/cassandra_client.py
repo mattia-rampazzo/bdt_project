@@ -43,6 +43,31 @@ class CassandraClient:
         self.session.execute(query)
         print("Users table created successfully.")
 
+    def create_table_municipality_weather_data(self):
+
+        # Create the 'users' table
+        query = """
+        CREATE TABLE IF NOT EXISTS municipality_air_quality_data (
+            municipality_id INT,          -- Partition Key
+            year INT,                     -- Bucketing Key
+            timestamp TIMESTAMP,          -- Clustering Key
+            name TEXT,
+            latitude DOUBLE,
+            longitude DOUBLE,
+            alder_pollen DOUBLE,
+            birch_pollen DOUBLE,
+            grass_pollen DOUBLE,
+            mugwort_pollen DOUBLE,
+            olive_pollen DOUBLE,
+            ragweed_pollen DOUBLE,
+            temperature_2m DOUBLE,
+            PRIMARY KEY ((municipality_id, year), timestamp)
+        ) WITH CLUSTERING ORDER BY (timestamp DESC);
+        """
+        # Execute the query
+        self.session.execute(query)
+        print("municipality_air_quality_data table created successfully.")
+
     def get_user(self, id):
 
         # Return a dict

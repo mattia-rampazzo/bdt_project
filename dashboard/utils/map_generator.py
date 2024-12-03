@@ -1,6 +1,7 @@
 import folium.elements
 import folium
 import json
+import os
 
 from services.redis_client import RedisClient
 
@@ -81,7 +82,7 @@ def add_js(m):
 def generate_pollen_risk_map():
  
     # Load the GeoJSON data of Trentino-AltoAdige
-    geojson_path = 'ui/data/Trentino-AltoAdige_municipalities.geojson'
+    geojson_path = os.path.join("data", "Trentino-AltoAdige_municipalities.geojson")
     with open(geojson_path) as f:
         geojson_data = json.load(f)
 
@@ -90,14 +91,16 @@ def generate_pollen_risk_map():
     # Get all keys matching the pattern 'municipality:*'
     municipality_keys = r.keys('municipality:*')
 
-
-    pollen_risk_dict = {}
+    # A dict containing a dict for each municipality
+    # The inner dict contains the relative level of concentration for each pollen
+    municipalities_pollen_risk_dict = {}
     
-    for key in municipality_keys:
-        
+    for key in municipality_keys:        
         municipality_data = r.hgetall(key)
-
-        print(municipality_data)
+        municipality_id =  int(key.split(':')[1])
+        
+        # print(municipality_id)
+        # print(municipality_data)
         alder_pollen = float(municipality_data.get('alder_pollen', 0.0))
         birch_pollen = float(municipality_data.get('birch_pollen', 0.0))
         mugwort_pollen = float(municipality_data.get('mugwort_pollen', 0.0))
@@ -105,11 +108,8 @@ def generate_pollen_risk_map():
         ragweed_pollen = float(municipality_data.get('ragweed_pollen', 0.0))
         grass_pollen = float(municipality_data.get('grass_pollen', 0.0))
 
-
-
         # Classify pollen concentration
         pollen_risk = {}
-
         pollen_risk["Alder"] = classify_pollen_concentration("Alder", alder_pollen)
         pollen_risk["Birch"] = classify_pollen_concentration("Birch", birch_pollen)
         pollen_risk["Mugwort"] = classify_pollen_concentration("Mugwort", mugwort_pollen)
@@ -117,18 +117,19 @@ def generate_pollen_risk_map():
         pollen_risk["Ragweed"] = classify_pollen_concentration("Ragweed", ragweed_pollen)
         pollen_risk["Grass"] = classify_pollen_concentration("Grass", grass_pollen)
 
-        pollen_risk_dict[int(municipality_data["municipality_id"])] = pollen_risk
+        # Assign the pollen ris
+        municipalities_pollen_risk_dict[municipality_id] = pollen_risk
 
 
     # https://python-visualization.github.io/folium/latest/advanced_guide/colormaps.html#Self-defined
     def my_color_function(feature, key):
 
         # Those municipalities with no data
-        if feature["properties"]["com_istat_code_num"] not in pollen_risk_dict.keys():
+        if feature["properties"]["com_istat_code_num"] not in municipalities_pollen_risk_dict.keys():
             return"#000000"
 
         # pollen risk for a specific type (e.g key=Alder)
-        pollen_risk = pollen_risk_dict[feature["properties"]["com_istat_code_num"]][key]
+        pollen_risk = municipalities_pollen_risk_dict[feature["properties"]["com_istat_code_num"]][key]
 
 
         return get_pollen_risk_color(pollen_risk)
@@ -137,41 +138,18 @@ def generate_pollen_risk_map():
     # almost average coordinates of Trentino Alto Adige
     m = folium.Map(location=[46.4, 11.4], tiles="cartodb positron", zoom_start=8)
 
-    # popup = folium.GeoJsonPopup(fields=["com_istat_code_num"])
-    # popup = folium.GeoJsonPopup("name")
 
-    # def popup_function(feature):
-    #     properties = feature['properties']
-    #     return folium.Popup(f'<h3>{properties.get("name", "No Title")}</h3>', max_width=300)
-    
-    # def tooltip_function(feature):
-    #     properties = feature['properties']
-    #     return  folium.GeoJsonTooltip(
-    #     fields=["name"],
-    #     aliases=["name"],
-    #     localize=True,
-    #     sticky=False,
-    #     labels=True,
-    #     style="""
-    #         background-color: #F0EFEF;
-    #         border: 2px solid black;
-    #         border-radius: 3px;
-    #         box-shadow: 3px;
-    #     """,
-    #     max_width=800,
-    # )
+    for pollen in ['Alder','Birch', 'Mugwort', 'Olive', 'Ragweed', 'Grass']:
 
-    for key in pollen_risk.keys():
-
-        fg = folium.FeatureGroup(name=key, show=False, control=True)  
+        fg = folium.FeatureGroup(name=pollen, show=False, control=True)  
 
         # Show by default
-        if key == 'Grass':
-            fg = folium.FeatureGroup(name=key, show=True)
+        if pollen == 'Grass':
+            fg = folium.FeatureGroup(name=pollen, show=True)
 
         folium.GeoJson(
             geojson_data,
-            style_function=lambda feature, key=key: {
+            style_function=lambda feature, key=pollen: {
                 "fillColor": my_color_function(feature, key),
                 "fillOpacity": 0.4,
                 "opacity": 0.1,
@@ -183,29 +161,19 @@ def generate_pollen_risk_map():
             
         ).add_to(fg)
 
-        # action = folium.JsCode(
-        # """
-        # function reset(e) {
-        #     console.log(e.target)
-        # }
-        #     """
-        # )
-
-        # fg.add_child(folium.elements.EventHandler("mouseover", action))
-
         # Add the FeatureGroup to the map
         fg.add_to(m)
 
+
     # Layer control to the map to toggle between pollen types
     folium.LayerControl(collapsed=False).add_to(m)
-
+    # Add legend
     add_legend(m)
 
-
-
+    # Save map
     print("Saving map")
-    
-    m.save("ui/static/pollen_risk_map.html")
+    map_path = os.path.join("static", "pollen_risk_map.html")
+    m.save(map_path)
 
     return m.get_root()._repr_html_()
     # return m._repr_html_()

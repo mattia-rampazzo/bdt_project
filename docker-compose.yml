@@ -84,6 +84,12 @@ services:
       - cassandra-data:/var/lib/cassandra
     networks:
       - bigdata
+    healthcheck:
+      test: ["CMD", "cqlsh", "cassandra", "9042", "-e", "DESCRIBE KEYSPACES;"]
+      #test: ["CMD", "nodetool", "status"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7.4-alpine
@@ -95,6 +101,11 @@ services:
       - redis-data:/data
     networks:
       - bigdata
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   setup:
     build:
@@ -109,7 +120,67 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      cassandra:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bigdata
 
+  air_quality_stream:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: air_quality_stream
+    working_dir: /bdt/spark_streaming
+    entrypoint: ["python3", "air_quality_stream.py"]    
+    volumes:
+      - ./spark_streaming:/bdt/spark_streaming  # Mount the code directory
+    depends_on:
+      setup:
+          condition: service_completed_successfully
+    networks:
+      - bigdata
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4040/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  recommendations_stream:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: recommendations_stream
+    working_dir: /bdt/spark_streaming
+    entrypoint: ["python3", "recommendations_stream.py"]
+    volumes:
+      - ./spark_streaming:/bdt/spark_streaming  # Mount the code directory
+    restart: always
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    networks:
+      - bigdata
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4040/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  air_quality_fetch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: air_quality_fetch
+    working_dir: /bdt/air_quality
+    entrypoint: ["python3", "air_quality_fetch.py"]
+    volumes:
+      - ./air_quality:/bdt/air_quality  # Mount the code directory
+    restart: always
+    depends_on:
+      air_quality_stream:
+          condition: service_healthy
     networks:
       - bigdata
 
@@ -126,40 +197,10 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      setup:
-          condition: service_completed_successfully
-    networks:
-      - bigdata
-
-  spark-streaming:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: spark-streaming
-    working_dir: /bdt/spark_streaming
-    entrypoint: ["python3", "app.py"]
-    volumes:
-      - ./spark_streaming:/bdt/spark_streaming  # Mount the code directory
-    restart: always
-    depends_on:
-      setup:
-        condition: service_completed_successfully
-    networks:
-      - bigdata
-
-  data-fetch:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: data-fetch
-    working_dir: /bdt/data_fetch
-    entrypoint: ["python3", "fetch_air_quality_data.py"]
-    volumes:
-      - ./data_fetch:/bdt/data_fetch  # Mount the code directory
-    restart: always
-    depends_on:
-      setup:
-          condition: service_completed_successfully
+      air_quality_stream:
+          condition: service_healthy
+      recommendations_stream:
+          condition: service_healthy
     networks:
       - bigdata
 

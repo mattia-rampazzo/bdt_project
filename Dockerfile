@@ -9,6 +9,8 @@ RUN apt-get -y install python3.11 python3-pip
 
 # Install Java (JDK)
 RUN apt-get install -y openjdk-11-jdk
+# Install curl
+RUN apt-get update && apt-get install -y curl
 
 # Set the working directory inside the container
 # WORKDIR /bdt/dashboard

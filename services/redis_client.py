@@ -40,8 +40,8 @@ class RedisClient:
         self.client.set(key, json.dumps(value))
     
 
-    def hset(self, name, key, value):
-        self.client.hset(name, key, value)
+    def hset(self, name, mapping):
+        self.client.hset(name, mapping=mapping)
 
     def hget(self, name, key):
         value = self.client.hget(name, key)

@@ -79,22 +79,25 @@ def start_background_kafka_consumers():
             thread2 = socketio.start_background_task(kafka_recommendations_consumer, thread2_event)
 
 def kafka_map_consumer(event):
+
     consumer = KafkaConsumerWrapper()
     try:
         while event.is_set():
-            msg = consumer.poll(topic='a', timeout_ms=1000)
+            # Poll every 30 seconds
+            # In this application having data in real time not so important
+            msg = consumer.poll(topic='a', timeout_ms=30*1000)
             if not msg:
                 continue
 
             generate_pollen_risk_map()
             socketio.emit('updated_pollen_risk_map', {'message': 'Map updated'})
 
-            for partition, messages in msg.items():
-                for message in messages:
-                    try:
-                        print(f"Received message: {message.value.decode('utf-8')}")
-                    except Exception as e:
-                        print(f"Error decoding message: {e}")
+            # for partition, messages in msg.items():
+            #     for message in messages:
+            #         try:
+            #             print(f"Received message: {message.value.decode('utf-8')}")
+            #         except Exception as e:
+            #             print(f"Error decoding message: {e}")
     finally:
         try:
             consumer.close()
@@ -161,14 +164,13 @@ def start_simulation():
 
     # Simulate wereable data
     while is_simulation_running:
-        payload = ws.generate_data()
+        data = ws.generate_data()
 
         # Send data to the Dashboard
-        socketio.emit('new_data', payload)
+        socketio.emit('new_data', data)
 
         # Send data to Kafka
-        data=json.dumps(payload).encode('utf-8')
-        producer.produce_data('w', data)
+        producer.produce_data('w', key = data['id'], value=data)
 
         # Wait before sending the next data
         time.sleep(1)

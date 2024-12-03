@@ -85,10 +85,12 @@ def setup_cassandra():
     cassandra = CassandraClient(CASSANDRA_CLUSTER)
     
     cassandra.create_table_user()
+    cassandra.create_table_municipality_weather_data()
 
+    # User for demo
     cassandra.add_user({
-        'user_id': uuid.uuid4(), 
-        'username': "pearl",
+        'user_id': uuid.UUID("f72f5a88-30bd-46ce-97ee-63ac7528155e"), 
+        'username': "earl",
         'email': "at com"
     })
 

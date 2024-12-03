@@ -1,4 +1,5 @@
 from kafka import KafkaProducer, KafkaConsumer
+import json
 import os
 
 from dotenv import load_dotenv
@@ -22,12 +23,20 @@ topics_dict['w'] = WEREABLE_SIMULATOR_TOPIC
 class KafkaProducerWrapper:
     def __init__(self, bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS):
         self.bootstrap_servers = bootstrap_servers
-        self.producer = KafkaProducer(bootstrap_servers=bootstrap_servers)
+        self.producer = KafkaProducer(
+            bootstrap_servers=bootstrap_servers,
+            key_serializer=lambda k: str(k).encode('utf-8'),
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
         #self.consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers, auto_offset_reset='earliest', enable_auto_commit=True)
 
-    def produce_data(self, topic, data):
+    def produce_data(self, topic, key, value):
         # Send message to a Kafka topic
-        self.producer.send(topics_dict[topic], value=data)
+        self.producer.send(
+            topics_dict[topic],
+            key = key,
+            value=value
+        )
 
 
 class KafkaConsumerWrapper:

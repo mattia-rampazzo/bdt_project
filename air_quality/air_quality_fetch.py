@@ -24,7 +24,7 @@ def send_to_kafka(kafka, topic, data):
         # print(f"Sent data for municipality {municipality_id}, data {municipality_data}")
 
 # merge the two datasets
-def combine_aqi_temperature_data(aqi_data, simulation_time, temperature_data):
+def merge_data(aqi_data, simulation_time, temperature_data):
 
     data = aqi_data
     for key in data:
@@ -110,22 +110,28 @@ def api_call(df_mun, url, simulation_time, weather_variables):
 def fetch_data(df_mun, simulation_time):
     # Variables we are interested in
     pollen_variables = ["alder_pollen", "birch_pollen", "grass_pollen", "mugwort_pollen", "olive_pollen", "ragweed_pollen"]
-    weather_variables = ["temperature_2m"]
+    weather_variables = [
+        "temperature_2m", "relative_humidity_2m", "precipitation", "rain",
+        "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
+        "wind_speed_10m", "soil_temperature_0_to_7cm"
+    ]
 
     split_size = 150 # we want at most 150 locations for each API call
-    aqi_data = dict()
-    temperature_data = dict()
+    pollen_data = dict()
+    air_quality_data = dict()
 
     num_splits = len(df_mun) // split_size + (1 if len(df_mun) % split_size != 0 else 0)
     
     for i in range(num_splits):
         split_df = df_mun.iloc[i * split_size:(i + 1) * split_size]
         # unfortunately two API calls to retrieve all the data
-        aqi_data.update(api_call(split_df, "https://air-quality-api.open-meteo.com/v1/air-quality",  simulation_time, pollen_variables))
-        temperature_data.update(api_call(split_df, "https://api.open-meteo.com/v1/forecast", simulation_time,  weather_variables))
+        pollen_data.update(api_call(split_df, "https://air-quality-api.open-meteo.com/v1/air-quality",  simulation_time, pollen_variables))
+        #air_quality_data.update(api_call(split_df, "https://api.open-meteo.com/v1/forecast", simulation_time,  weather_variables))
+        air_quality_data.update(api_call(split_df, "https://archive-api.open-meteo.com/v1/archive", simulation_time,  weather_variables))
 
 
-    data = combine_aqi_temperature_data(aqi_data, simulation_time, temperature_data)
+
+    data = merge_data(pollen_data, simulation_time, air_quality_data)
     return data
     
 

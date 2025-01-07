@@ -81,7 +81,16 @@ def parse_df(spark_df):
         StructField("olive_pollen", DoubleType(), True),
         StructField("ragweed_pollen", DoubleType(), True),
         StructField("temperature_2m", DoubleType(), True),
-        StructField("timestamp", DoubleType(), True)
+        StructField("timestamp", DoubleType(), True),
+        StructField("relative_humidity_2m", DoubleType(), True),
+        StructField("precipitation", DoubleType(), True),
+        StructField("rain", DoubleType(), True),
+        StructField("cloud_cover", DoubleType(), True),
+        StructField("cloud_cover_low", DoubleType(), True),
+        StructField("cloud_cover_mid", DoubleType(), True),
+        StructField("cloud_cover_high", DoubleType(), True),
+        StructField("wind_speed_10m", DoubleType(), True),
+        StructField("soil_temperature_0_to_7cm", DoubleType(), True)
     ])
 
     # Deserialize JSON messages
@@ -143,7 +152,16 @@ def write_batch_to_redis(batch_df, batch_id):
             "mugwort_pollen": row.mugwort_pollen,
             "olive_pollen": row.olive_pollen,
             "ragweed_pollen": row.ragweed_pollen,
-            "temperature_2m": row.temperature_2m
+            "temperature_2m": row.temperature_2m,
+            "relative_humidity_2m": row.relative_humidity_2m,
+            "precipitation": row.precipitation,
+            "rain": row.rain,
+            "cloud_cover": row.cloud_cover,
+            "cloud_cover_low": row.cloud_cover_low,
+            "cloud_cover_mid": row.cloud_cover_mid,
+            "cloud_cover_high": row.cloud_cover_high,
+            "wind_speed_10m": row.wind_speed_10m,
+            "soil_temperature_0_to_7cm": row.soil_temperature_0_to_7cm
         }
         # Store the data as a Redis hash
         redis.hset(key, value)

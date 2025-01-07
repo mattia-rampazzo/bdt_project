@@ -57,7 +57,7 @@ class RedisClient:
 
         if not self.exists('municipalities'):
             return None
-
+        
         closest = self.client.georadius(name="municipalities", longitude=longitude, latitude=latitude, radius=radius, unit='km', withdist=True, count=1)
         if closest:
             municipality = closest[0][0]

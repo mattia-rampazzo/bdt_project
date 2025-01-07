@@ -10,14 +10,26 @@ from dashboard.utils.wereable_simulator import WereableSimulator
 from dashboard.utils.map_generator import generate_pollen_risk_map
 
 import sys
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Simulation params
+USER_ID = os.getenv('USER_ID')
+LAT = os.getenv('LAT')
+LNG = os.getenv('LNG')
+
+USER_ID = "f72f5a88-30bd-46ce-97ee-63ac7528155e"
+# LAT = 46.215179
+# LNG = 11.119681
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 # Wereable Simulator instance
-ws = WereableSimulator()
+ws = WereableSimulator(individual_id=USER_ID, lat=LAT, lng=LNG)
 is_simulation_running = False
 
 # Producer for wereable data
@@ -42,7 +54,6 @@ def stop_background_kafka_consumers():
 
     # print('dISCONNECT TRIGGERED', file=sys.stdout)
 
-
     with thread1_lock:
         # print(thread1, file=sys.stdout)
         if thread1 is not None:
@@ -60,7 +71,7 @@ def stop_background_kafka_consumers():
     global ws
 
     is_simulation_running = False
-    ws = WereableSimulator()
+    ws = WereableSimulator(individual_id=USER_ID, lat=LAT, lng=LNG)
 
 @socketio.on('connect')
 def start_background_kafka_consumers():
@@ -111,13 +122,11 @@ def kafka_map_consumer(event):
 
 def kafka_recommendations_consumer(event):
     
-
     consumer = KafkaConsumerWrapper()
     received = set()
     try:
         while event.is_set():
             
-
             msg = consumer.poll(topic='h', timeout_ms=1000)
             if not msg:
                 continue
@@ -169,6 +178,9 @@ def start_simulation():
         # Send data to the Dashboard
         socketio.emit('new_data', data)
 
+        print(data['id'])
+        print(data['lat'])
+
         # Send data to Kafka
         producer.produce_data('w', key = data['id'], value=data)
 
@@ -184,7 +196,7 @@ def stop_simulation():
     global ws
 
     is_simulation_running = False
-    ws = WereableSimulator()
+    ws = WereableSimulator(individual_id=USER_ID, lat=LAT, lng=LNG)
 
 
 @socketio.on('start_stress')

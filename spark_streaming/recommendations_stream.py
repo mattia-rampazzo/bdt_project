@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import uuid
 import time
 import os
+from datetime import date
 
 from kafka import KafkaAdminClient
 
@@ -113,8 +114,9 @@ def write_to_console(spark_df):
     query = spark_df.writeStream \
         .outputMode("complete") \
         .format("console") \
-        .trigger(processingTime="1 minutes") \
         .start()
+        #.trigger(processingTime="1 minutes") \
+        #.start()
 
     query.awaitTermination()
 
@@ -134,8 +136,8 @@ def generate_recommendations(user_data, municipality_data, avg_heart_rate, avg_e
 
     recommendations = []
 
-    print(f"User name: {user_data['username']}" )    
-    print(f"Pollen levels: {municipality_data['grass_pollen']}")
+    # print(f"User name: {user_data['username']}" )    
+    # print(f"Pollen levels: {municipality_data['grass_pollen']}")
     
     # Heart Rate: Recommend action if heart rate exceeds 100 bpm.
     # EDA (Stress): Suggest stress management if EDA exceeds 10 µS.
@@ -158,7 +160,7 @@ def generate_recommendations(user_data, municipality_data, avg_heart_rate, avg_e
     #     recommendations.append("Ragweed pollen levels are high. Consider staying indoors and taking preventive measures.")
     # if user_profile.get('grass_pollen') is not None and grass_pollen > 0:
     #     recommendations.append("Grass pollen levels are high. Consider staying indoors and taking preventive measures.")
-    recommendations.append(f"User name: {user_data['username']}" )
+    recommendations.append(f"User has allergy: {user_data['grass_pollen_allergy']}, Grass pollen : {municipality_data['grass_pollen']}" )
 
     return recommendations
 
@@ -179,7 +181,11 @@ def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_eda, avg_skin_tem
     if not user_data:
         # Look in Cassandra
         user_data = get_user_profile(user_id)
-        user_data["user_id"] = user_id # json.dumps dont work with UUI
+        # json.dumps dont work with UUI and Date
+        user_data["user_id"] = user_id 
+        # if isinstance(user_data.get("date_of_birth"), date):
+        user_data["date_of_birth"] = str(user_data["date_of_birth"])
+        print(user_data["date_of_birth"])
         # Store in Redis
         r.set(f'user:{user_id}', user_data)
 

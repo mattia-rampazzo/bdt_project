@@ -18,6 +18,7 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
 AIR_QUALITY_TOPIC = os.getenv('AIR_QUALITY_TOPIC')
 WEREABLE_SIMULATOR_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
 HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
+USER_ID = os.getenv('USER_ID')
 
 
 # Cassandra environment variables
@@ -87,15 +88,86 @@ def setup_cassandra():
     cassandra.create_table_user()
     cassandra.create_table_municipality_weather_data()
 
-    # User for demo
-    cassandra.add_user({
-        'user_id': uuid.UUID("f72f5a88-30bd-46ce-97ee-63ac7528155e"), 
-        'username': "earl",
-        'email': "at com"
-    })
+    # Read df
+    df_users = pd.read_csv('data/Users_synthetic_dataset.csv')
 
-    # Close the session and cluster connection
+    # Keep firt 100
+    df_users = df_users.head(100)
+
+    # Drop PatientID: not unique
+    df_users.drop(columns = ["PatientID"], inplace=True)
+
+    # Define columns not to convert to boolean
+    non_bool_columns = [
+        'EducationLevel', 
+        'bmi',
+        'PhysicalActivity',
+        'DietQuality',
+        'SleepQuality',
+        'PollutionExposure',
+        'PollenExposure',
+        'DustExposure',
+        'Cad_Probability',
+        'Date_of_Birth'
+    ]
+
+    # Convert relevant columns to boolean
+    for col in df_users.columns:
+        if col not in non_bool_columns:
+            df_users[col] = df_users[col] == 1
+
+    # Transform each row into a dictionary
+    list_of_dicts = df_users.to_dict(orient='records')
+
+    # Print the result
+    for user in list_of_dicts:
+        cassandra.add_user(user)
+        # print(user)
+
+    # Define a user for the simulation, assign a fixed uuid
+    # 5693,1,1,25.5,0,6.6,2.8,5.5,3.0,6.3,2.2,0,1,0,0,0,0,1,1,0,1,1,0,0.02,0,0,1,0,0,1,0,1,1965-06-03
+    user = {
+        'user_id': uuid.UUID(USER_ID),
+        'gender': True,
+        'education_level': 1,
+        'bmi': 25.5,
+        'current_smoker': False, 
+        'physical_activity': 6.6,
+        'diet_quality': 2.8,
+        'sleep_quality': 5.5,
+        'pollution_exposure': 3.0,
+        'pollen_exposure': 6.3,
+        'dust_exposure': 2.2,
+        'pet_allergy': False,
+        'family_history_asthma': True,
+        'history_of_allergies': False,
+        'eczema': True,
+        'hay_fever': False,
+        'wheezing': False,
+        'shortness_of_breath': False,
+        'chest_tightness': True,
+        'coughing': True,
+        'nighttime_symptoms': False,
+        'exercise_induced': True,
+        'obesity': True,
+        'cad_probability': 0.10,
+        'cad': True,
+        'ragweed_pollen_allergy': False,
+        'grass_pollen_allergy': True,
+        'mugwort_pollen_allergy': True,
+        'birch_pollen_allergy': False,
+        'alder_pollen_allergy': False,
+        'olive_pollen_allergy': True,
+        'asthma_allergy': True,
+        'date_of_birth': '1965-06-03'
+    }
+
+    cassandra.add_user(user)
+    print("Data inserted successfully.")
+
+    # Shutdown the Cassandra connection
     cassandra.shutdown()
+
 
 if __name__ == "__main__":
 

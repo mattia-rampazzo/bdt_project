@@ -1,0 +1,13 @@
+{
+    "latitude": 46.0679,
+    "longitude": 11.1211,
+    "pollen_types": [
+        "Alder pollen (grains/m³)",
+        "Birch pollen (grains/m³)",
+        "Grass pollen (grains/m³)",
+        "Mugwort pollen (grains/m³)",
+        "Olive pollen (grains/m³)",
+        "Ragweed pollen (grains/m³)"
+    ],
+    "selected_pollen": "Birch pollen (grains/m³)"
+}

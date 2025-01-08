@@ -12,11 +12,13 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
 WEREABLE_SIMULATOR_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
 HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
 AIR_QUALITY_TOPIC = os.getenv('AIR_QUALITY_TOPIC')
+USER_TOPIC = os.getenv('USER_TOPIC')
 
 # Dictionnaire to easily access topics
 topics_dict = {}
 topics_dict['a'] = AIR_QUALITY_TOPIC
 topics_dict['h'] = HEALTH_RECOMMENDATIONS_TOPIC
+topics_dict['u'] = USER_TOPIC
 topics_dict['w'] = WEREABLE_SIMULATOR_TOPIC
 
 

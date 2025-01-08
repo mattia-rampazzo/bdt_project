@@ -18,6 +18,7 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
 AIR_QUALITY_TOPIC = os.getenv('AIR_QUALITY_TOPIC')
 WEREABLE_SIMULATOR_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
 HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
+USER_TOPIC = os.getenv('USER_TOPIC')
 USER_ID = os.getenv('USER_ID')
 
 
@@ -30,6 +31,7 @@ TOPICS = [
     NewTopic(AIR_QUALITY_TOPIC, num_partitions=3, replication_factor=1),
     NewTopic(WEREABLE_SIMULATOR_TOPIC, num_partitions=3, replication_factor=1),
     NewTopic(HEALTH_RECOMMENDATIONS_TOPIC, num_partitions=3, replication_factor=1),
+    NewTopic(USER_TOPIC, num_partitions=3, replication_factor=1),
 ]
 
 def wait_for_kafka_ready(bootstrap_servers, max_retries=10, delay=10):

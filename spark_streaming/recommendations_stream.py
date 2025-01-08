@@ -185,7 +185,7 @@ def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_eda, avg_skin_tem
         user_data["user_id"] = user_id 
         # if isinstance(user_data.get("date_of_birth"), date):
         user_data["date_of_birth"] = str(user_data["date_of_birth"])
-        print(user_data["date_of_birth"])
+        # print(user_data["date_of_birth"])
         # Store in Redis
         r.set(f'user:{user_id}', user_data)
 

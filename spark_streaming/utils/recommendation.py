@@ -1,12 +1,6 @@
 import numpy as np
 import pandas as pd
 
-# Load the user data from the CSV file
-df = pd.read_csv('/content/SmallDatasetV1.csv')
-
-# Select a specific user (for example, the first user in the DataFrame)
-user_data = df.iloc[0]  # Adjust the index to select different users
-
 # Example functions for calculating individual indexes
 # Sources:
 # - Pollen impact: Bousquet et al., "ARIA (Allergic Rhinitis and its Impact on Asthma) guidelines."
@@ -114,7 +108,7 @@ def calculate_risk_score(environmental_data, user_data, weights):
     # Adjust for user allergies based on the new column names
     base_pollen_score = 0
     for pollen_type, score in pollen_scores.items():
-        allergy_column = f"{pollen_type.split('_')[0].capitalize()}_Pollen_Allergy"  # Assuming column names like "Alder_Pollen_Allergy"
+        allergy_column = f"{pollen_type}_allergy"  # Assuming column names like "alder_pollen_allergy"
         if user_data[allergy_column] == 1:
             base_pollen_score += score * weights["pollen"] * 1.5  # Increase score due to allergy (literature-backed)
         else:
@@ -126,13 +120,13 @@ def calculate_risk_score(environmental_data, user_data, weights):
     # Adjust the final score for user-specific conditions
     final_score = base_pollen_score + environmental_impact_score
 
-    if user_data["Asthma_Allergy"] == 1:
+    if user_data["asthma_allergy"] == 1:
         final_score *= 1.3  # WHO and ARIA guidelines
-    if user_data["HayFever"] == 1:
+    if user_data["hay_fever"] == 1:
         final_score *= 1.1  # WHO and ARIA guidelines
-    if user_data["Eczema"] == 1:
+    if user_data["eczema"] == 1:
         final_score *= 1.05  # ARIA guidelines
-    if user_data["Cad"] == 1:
+    if user_data["cad"] == 1:
         final_score *= 1.2  # CAD exacerbation due to poor air quality (American Heart Association)
 
     # Normalize the final score to 0-1
@@ -153,7 +147,7 @@ def generate_recommendation(score, user_data, environmental_data, pollen_scores)
 
     # Specific recommendations based on allergies and conditions
     for pollen_type, pollen_score in pollen_scores.items():
-        allergy_column = f"{pollen_type.split('_')[0].capitalize()}_Pollen_Allergy"
+        allergy_column = f"{pollen_type}_allergy"
         if user_data[allergy_column] == 1:
             if pollen_score < 0.5:
                 recommendations.append(f"{pollen_type.replace('_', ' ').title()}: Low pollen levels detected. You might experience mild symptoms.")
@@ -162,8 +156,8 @@ def generate_recommendation(score, user_data, environmental_data, pollen_scores)
             else:
                 recommendations.append(f"{pollen_type.replace('_', ' ').title()}: High pollen levels detected. Consider staying indoors and take necessary precautions.")
 
-    if user_data["Asthma_Allergy"] == 1:
-        asthma_risk = np.mean([pollen_scores[pt] for pt in pollen_scores if user_data[f"{pt.split('_')[0].capitalize()}_Pollen_Allergy"] == 1])
+    if user_data["asthma_allergy"] == 1:
+        asthma_risk = np.mean([pollen_scores[pt] for pt in pollen_scores if user_data[f"{pt}_allergy"] == 1])
         if asthma_risk < 0.5:
             recommendations.append("Asthma: Low risk detected. Keep your inhaler handy, but you might not experience severe symptoms.")
         elif asthma_risk < 0.8:
@@ -171,8 +165,8 @@ def generate_recommendation(score, user_data, environmental_data, pollen_scores)
         else:
             recommendations.append("Asthma: High risk detected. Limit outdoor activities, have your inhaler accessible, and consider staying indoors.")
 
-    if user_data["HayFever"] == 1:
-        hay_fever_risk = np.mean([pollen_scores[pt] for pt in pollen_scores if user_data[f"{pt.split('_')[0].capitalize()}_Pollen_Allergy"] == 1])
+    if user_data["hay_fever"] == 1:
+        hay_fever_risk = np.mean([pollen_scores[pt] for pt in pollen_scores if user_data[f"{pt}_allergy"] == 1])
         if hay_fever_risk < 0.5:
             recommendations.append("Hay Fever: Low risk detected. Symptoms might be mild.")
         elif hay_fever_risk < 0.8:
@@ -180,8 +174,8 @@ def generate_recommendation(score, user_data, environmental_data, pollen_scores)
         else:
             recommendations.append("Hay Fever: High risk detected. Stay indoors if possible and take antihistamines.")
 
-    if user_data["Eczema"] == 1:
-        eczema_risk = np.mean([pollen_scores[pt] for pt in pollen_scores if user_data[f"{pt.split('_')[0].capitalize()}_Pollen_Allergy"] == 1])
+    if user_data["eczema"] == 1:
+        eczema_risk = np.mean([pollen_scores[pt] for pt in pollen_scores if user_data[f"{pt}_allergy"] == 1])
         if eczema_risk < 0.5:
             recommendations.append("Eczema: Low risk of skin irritation. Keep your skin moisturized and avoid known irritants.")
         elif eczema_risk < 0.8:
@@ -189,14 +183,24 @@ def generate_recommendation(score, user_data, environmental_data, pollen_scores)
         else:
             recommendations.append("Eczema: High risk of severe skin irritation. Stay indoors, moisturize often, and avoid known irritants.")
 
-    if user_data["Cad"] == 1:
+    if user_data["cad"] == 1:
         recommendations.append("Cardiac Health: High risk of exacerbation due to poor air quality. Avoid outdoor exertion, monitor your heart condition, and consult your doctor if necessary.")
 
     return recommendations
 
+def normalize_environmental_data(env_data):
+    normalized_data = {}
+    for key, value in env_data.items():
+        try:
+            # Convert numeric strings to float
+            normalized_data[key] = float(value) if value.lower() != 'nan' else None
+        except (ValueError, AttributeError):
+            # Leave non-numeric values as-is
+            normalized_data[key] = value
+    return normalized_data
 
 # Main function to process user and environmental data
-def main(user_data, environmental_data):
+def process_data(user_data, environmental_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level):
     # Weightings for the environmental factors based on literature
     weights = {
         "pollen": 1.0,  # Pollen weight reflects its direct impact on allergic individuals
@@ -205,6 +209,9 @@ def main(user_data, environmental_data):
         "pm2_5": 1.3,   # PM2.5 has a greater impact on respiratory health (WHO and EPA guidelines)
         "ozone": 1.2,   # Ozone is known to exacerbate asthma and allergic reactions
     }
+
+    # Convert to float the numerical data 
+    environmental_data = normalize_environmental_data(environmental_data)
 
     # Calculate each index
     pei, pollen_scores = calculate_pei(environmental_data)
@@ -233,6 +240,13 @@ def main(user_data, environmental_data):
 
 # Example usage with user data and environmental data
 if __name__ == "__main__":
+
+    # Load the user data from the CSV file
+    df = pd.read_csv('/content/SmallDatasetV1.csv')
+
+    # Select a specific user (for example, the first user in the DataFrame)
+    user_data = df.iloc[0]  # Adjust the index to select different users
+
     # Example environmental data
     environmental_data = {
         "municipality_id": "22127",
@@ -265,24 +279,24 @@ if __name__ == "__main__":
     user_data = df.iloc[0]  # Adjust the index to select different users
 
     # Run the main function
-    results = main(user_data, environmental_data)
+    results = process_data(user_data, environmental_data)
 
-# Output the results
-results = main(user_data, environmental_data)
+# # Output the results
+# results = main(user_data, environmental_data)
 
-print("Scores:")
-print(f"PEI: {results['pei']:.2f}")
-print(f"AQII: {results['aqii']:.2f}")
-print(f"OPII: {results['opii']:.2f}")
-print(f"PMHI: {results['pmhi']:.2f}")
-print(f"CERI: {results['ceri']:.2f}")
-print(f"Final Risk Score: {results['final_score']:.2f}\n")
+# print("Scores:")
+# print(f"PEI: {results['pei']:.2f}")
+# print(f"AQII: {results['aqii']:.2f}")
+# print(f"OPII: {results['opii']:.2f}")
+# print(f"PMHI: {results['pmhi']:.2f}")
+# print(f"CERI: {results['ceri']:.2f}")
+# print(f"Final Risk Score: {results['final_score']:.2f}\n")
 
-# Print individual pollen scores
-print("Pollen Scores:")
-for pollen_type, pollen_score in results['pollen_scores'].items():
-    print(f"{pollen_type.replace('_', ' ').title()}: {pollen_score:.2f}")
+# # Print individual pollen scores
+# print("Pollen Scores:")
+# for pollen_type, pollen_score in results['pollen_scores'].items():
+#     print(f"{pollen_type.replace('_', ' ').title()}: {pollen_score:.2f}")
 
-print("\nRecommendations:")
-for recommendation in results['recommendations']:
-    print(f"- {recommendation}")
+# print("\nRecommendations:")
+# for recommendation in results['recommendations']:
+#     print(f"- {recommendation}")

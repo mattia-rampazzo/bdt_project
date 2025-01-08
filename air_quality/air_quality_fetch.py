@@ -109,7 +109,14 @@ def api_call(df_mun, url, simulation_time, weather_variables):
 
 def fetch_data(df_mun, simulation_time):
     # Variables we are interested in
-    pollen_variables = ["alder_pollen", "birch_pollen", "grass_pollen", "mugwort_pollen", "olive_pollen", "ragweed_pollen"]
+    pollen_variables = [
+        "european_aqi", "us_aqi",
+        "pm10", "pm2_5", "carbon_monoxide", "carbon_dioxide", 
+        "nitrogen_dioxide", "sulphur_dioxide", "ozone", "aerosol_optical_depth", 
+        "dust", "uv_index", "uv_index_clear_sky", "ammonia",
+        "alder_pollen", "birch_pollen", "grass_pollen",
+        "mugwort_pollen", "olive_pollen", "ragweed_pollen"
+    ]
     weather_variables = [
         "temperature_2m", "relative_humidity_2m", "precipitation", "rain",
         "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
@@ -137,7 +144,7 @@ def fetch_data(df_mun, simulation_time):
 
 def main():
 
-    time.sleep(10)  # Wait 10 seconds other services are up and running
+    # time.sleep(10)  # Wait 10 seconds other services are up and running
     # Convert to a datetime object
 
     simulation_time = datetime.fromisoformat(SIMULATION_TIME)

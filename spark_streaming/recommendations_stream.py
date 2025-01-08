@@ -12,6 +12,7 @@ from kafka import KafkaAdminClient
 from services.redis_client import RedisClient
 from services.cassandra_client import CassandraClient
 
+from spark_streaming.utils.recommendation import process_data
 
 
 # Load environment variables from .env file
@@ -114,9 +115,8 @@ def write_to_console(spark_df):
     query = spark_df.writeStream \
         .outputMode("complete") \
         .format("console") \
+        .trigger(processingTime="1 minutes") \
         .start()
-        #.trigger(processingTime="1 minutes") \
-        #.start()
 
     query.awaitTermination()
 
@@ -132,37 +132,37 @@ def write_to_kafka(spark_df):
 
     query.awaitTermination()
 
-def generate_recommendations(user_data, municipality_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_levels):
+# def generate_recommendations(user_data, environmental_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_levels):
 
-    recommendations = []
+#     recommendations = []
 
-    # print(f"User name: {user_data['username']}" )    
-    # print(f"Pollen levels: {municipality_data['grass_pollen']}")
+#     # print(f"User name: {user_data['username']}" )    
+#     # print(f"Pollen levels: {municipality_data['grass_pollen']}")
     
-    # Heart Rate: Recommend action if heart rate exceeds 100 bpm.
-    # EDA (Stress): Suggest stress management if EDA exceeds 10 µS.
-    # Skin Temperature: Advise checking for fever if temperature exceeds 37°C.
+#     # Heart Rate: Recommend action if heart rate exceeds 100 bpm.
+#     # EDA (Stress): Suggest stress management if EDA exceeds 10 µS.
+#     # Skin Temperature: Advise checking for fever if temperature exceeds 37°C.
 
-    # Recommendations based only on wearable data
-    if avg_eda > 10:
-        recommendations.append("Your stress levels seem high. Consider taking a break and practicing relaxation techniques.")
+#     # Recommendations based only on wearable data
+#     if avg_eda > 10:
+#         recommendations.append("Your stress levels seem high. Consider taking a break and practicing relaxation techniques.")
 
-    if avg_heart_rate > 100:
-        recommendations.append("Heart Rate: Recommend action if heart rate exceeds 100 bpm.")
+#     if avg_heart_rate > 100:
+#         recommendations.append("Heart Rate: Recommend action if heart rate exceeds 100 bpm.")
     
-    if avg_skin_temp > 37.5:
-        recommendations.append("Your body temperature is higher than normal. Monitor for symptoms of illness and consider consulting a healthcare provider.")
+#     if avg_skin_temp > 37.5:
+#         recommendations.append("Your body temperature is higher than normal. Monitor for symptoms of illness and consider consulting a healthcare provider.")
 
-    # Recommendations based on wearable data and pollen levels
-    # if user_profile.get('birch_pollen') is not None and birch_pollen > 0:
-    #     recommendations.append("Birch pollen levels are high. Consider staying indoors and taking preventive measures.")
-    # if user_profile.get('ragweed_pollen') is not None and ragweed_pollen > 0:
-    #     recommendations.append("Ragweed pollen levels are high. Consider staying indoors and taking preventive measures.")
-    # if user_profile.get('grass_pollen') is not None and grass_pollen > 0:
-    #     recommendations.append("Grass pollen levels are high. Consider staying indoors and taking preventive measures.")
-    recommendations.append(f"User has allergy: {user_data['grass_pollen_allergy']}, Grass pollen : {municipality_data['grass_pollen']}" )
+#     # Recommendations based on wearable data and pollen levels
+#     # if user_profile.get('birch_pollen') is not None and birch_pollen > 0:
+#     #     recommendations.append("Birch pollen levels are high. Consider staying indoors and taking preventive measures.")
+#     # if user_profile.get('ragweed_pollen') is not None and ragweed_pollen > 0:
+#     #     recommendations.append("Ragweed pollen levels are high. Consider staying indoors and taking preventive measures.")
+#     # if user_profile.get('grass_pollen') is not None and grass_pollen > 0:
+#     #     recommendations.append("Grass pollen levels are high. Consider staying indoors and taking preventive measures.")
+#     recommendations.append(f"User has allergy: {user_data['grass_pollen_allergy']}, Grass pollen : {environmental_data['grass_pollen']}" )
 
-    return recommendations
+#     return recommendations
 
 
 # Register UDF
@@ -174,7 +174,7 @@ def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_eda, avg_skin_tem
 
     # Look in Redis for data we need
     municipality_id = r.get_closest_municipality(lng, lat, 10000)
-    municipality_data = r.hgetall(municipality_id)
+    environmental_data = r.hgetall(municipality_id)
     user_data = r.get(f'user:{user_id}')
     
 
@@ -192,7 +192,11 @@ def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_eda, avg_skin_tem
     # Close Connection
     r.close()
 
-    return generate_recommendations(user_data, municipality_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level)
+    data = process_data(user_data, environmental_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level)
+
+    # print(data)
+
+    return data['recommendations']
 
 
 

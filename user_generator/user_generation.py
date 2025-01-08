@@ -8,7 +8,7 @@ from services.kafka_client import KafkaProducerWrapper
 
 def main():
 
-    time.sleep(10)  # Wait 10 seconds other services are up and running
+    # time.sleep(10)  # Wait 10 seconds other services are up and running
 
     # Setup kafka
     kafka = KafkaProducerWrapper()

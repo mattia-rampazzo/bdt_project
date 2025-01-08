@@ -2,13 +2,13 @@ import random
 import time
 
 class WereableSimulator:
-    def __init__(self, stress=False, illness = False, normal = True, individual_id="f72f5a88-30bd-46ce-97ee-63ac7528155e", lat=46.215179, lng=11.119681):
+    def __init__(self, individual_id, lat, lng, stress=False, illness = False, normal = True):
         self.stress = stress
         self.illness = True
         self.normal = normal
         self.individual_id = individual_id
-        self.lat = lat
-        self.lng = lng
+        self.lat = float(lat)
+        self.lng = float(lng)
         self.data = {
             'heart_rate': 70,
             'ibi': 1000 / 70,

@@ -94,6 +94,20 @@ class CassandraClient:
             name TEXT,
             latitude DOUBLE,
             longitude DOUBLE,
+            european_aqi DOUBLE,
+            us_aqi DOUBLE,
+            pm10 DOUBLE,
+            pm2_5 DOUBLE,
+            carbon_monoxide DOUBLE,
+            carbon_dioxide DOUBLE,
+            nitrogen_dioxide DOUBLE,
+            sulphur_dioxide DOUBLE,
+            ozone DOUBLE,
+            aerosol_optical_depth DOUBLE,
+            dust DOUBLE,
+            uv_index DOUBLE,
+            uv_index_clear_sky DOUBLE,
+            ammonia DOUBLE,
             alder_pollen DOUBLE,
             birch_pollen DOUBLE,
             grass_pollen DOUBLE,
@@ -112,6 +126,7 @@ class CassandraClient:
             soil_temperature_0_to_7cm DOUBLE,
             PRIMARY KEY ((municipality_id, year), timestamp)
         ) WITH CLUSTERING ORDER BY (timestamp DESC);
+
         """
         # Execute the query
         self.session.execute(query)

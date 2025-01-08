@@ -90,7 +90,21 @@ def parse_df(spark_df):
         StructField("cloud_cover_mid", DoubleType(), True),
         StructField("cloud_cover_high", DoubleType(), True),
         StructField("wind_speed_10m", DoubleType(), True),
-        StructField("soil_temperature_0_to_7cm", DoubleType(), True)
+        StructField("soil_temperature_0_to_7cm", DoubleType(), True),
+        StructField("pm10", DoubleType(), True),
+        StructField("pm2_5", DoubleType(), True),
+        StructField("carbon_monoxide", DoubleType(), True),
+        StructField("carbon_dioxide", DoubleType(), True),
+        StructField("nitrogen_dioxide", DoubleType(), True),
+        StructField("sulphur_dioxide", DoubleType(), True),
+        StructField("ozone", DoubleType(), True),
+        StructField("aerosol_optical_depth", DoubleType(), True),
+        StructField("dust", DoubleType(), True),
+        StructField("uv_index", DoubleType(), True),
+        StructField("uv_index_clear_sky", DoubleType(), True),
+        StructField("ammonia", DoubleType(), True),
+        StructField("european_aqi", DoubleType(), True),
+        StructField("us_aqi", DoubleType(), True)
     ])
 
     # Deserialize JSON messages
@@ -161,7 +175,21 @@ def write_batch_to_redis(batch_df, batch_id):
             "cloud_cover_mid": row.cloud_cover_mid,
             "cloud_cover_high": row.cloud_cover_high,
             "wind_speed_10m": row.wind_speed_10m,
-            "soil_temperature_0_to_7cm": row.soil_temperature_0_to_7cm
+            "soil_temperature_0_to_7cm": row.soil_temperature_0_to_7cm,
+            "pm10": row.pm10,
+            "pm2_5": row.pm2_5,
+            "carbon_monoxide": row.carbon_monoxide,
+            "carbon_dioxide": row.carbon_dioxide,
+            "nitrogen_dioxide": row.nitrogen_dioxide,
+            "sulphur_dioxide": row.sulphur_dioxide,
+            "ozone": row.ozone,
+            "aerosol_optical_depth": row.aerosol_optical_depth,
+            "dust": row.dust,
+            "uv_index": row.uv_index,
+            "uv_index_clear_sky": row.uv_index_clear_sky,
+            "ammonia": row.ammonia,
+            "european_aqi": row.european_aqi,
+            "us_aqi": row.us_aqi
         }
         # Store the data as a Redis hash
         redis.hset(key, value)

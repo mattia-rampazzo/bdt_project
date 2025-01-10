@@ -45,14 +45,14 @@ The core application is containerized and managed using Docker for easy setup an
     Build the required Docker images using the provided `Dockerfile` and `docker-compose.yml`:
     
     ```bash
-    docker-compose build
+    docker compose build
     ```
     
 4.  **Start the Application:**  
     Start the entire application stack (including all services like Kafka, Cassandra, Redis, Flask, and Spark) using Docker Compose:
     
     ```bash
-    docker-compose up -d
+    docker compose up -d
     
     ```
     
@@ -67,7 +67,7 @@ The core application is containerized and managed using Docker for easy setup an
     To stop the application run:
     
     ```bash
-    docker-compose down
+    docker compose down
  
     ```
 
@@ -107,6 +107,11 @@ A summary of the project structure and the main files is reported below:
  -   `CAD.csv`:  A CSV file for Cardiovascular disease analysis.
  -   `asthma_disease_data.csv`:  A CSV file for asthm analysis.
  -   `user_generation.py`:  Script that send new user to the system.
+
+
+## Results
+
+![Dashboard file](runs/1_first_recommendations.png)
 
 
 ## Authors

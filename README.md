@@ -114,6 +114,52 @@ A summary of the project structure and the main files is reported below:
 ![Dashboard file](runs/1_first_recommendations.png)
 
 
+# Predictions Folder
+
+The `Predictions` folder, though not yet integrated with the core functionalities and the interface, serves as a foundation for future enhancements to the project. It showcases a solid, although not yet perfect, prediction system designed to empower users with insights into pollen levels. Once integrated, this system will enable users to make informed decisions, take proactive measures to manage their allergies, and plan their daily activities with greater confidence and protection. Below is a brief explanation of the contents of this folder:
+
+### Folder Contents
+
+1. **`Merged_Valleys_and_Municipalities.csv`**  
+   This file contains the coordinates of most municipalities in the region, along with the valleys they are associated with. The dataset was built by integrating data from a geojson file ([source here](https://github.com/openpolis/geojson-italy/blob/5dd489e676158175c75ae452ab9ec449bf5efb4b/geojson/limits_IT_municipalities.geojson)) and additional data gathered via ChatGPT and online sources. While it does not cover all municipalities and valleys, it is sufficient for creating a structured model that includes the region's major valleys for reliable data gathering and predictions.
+
+2. **`Valley_Boundaries.csv`**  
+   This file defines the boundaries of each selected valley by constructing perimeters based on the municipalities within them. The area enclosed within these perimeters represents the corresponding valley's boundary.
+
+3. **`config.json`**  
+   A configuration file allowing users to launch simulations. It includes details such as:
+   - The latitude and longitude for the region's focal point.
+   - Types of pollen being monitored (e.g., Birch, Grass, Olive).
+   - The specific pollen type selected for prediction.
+
+4. **`daily_data.csv`**  
+   A dataset containing simulation results for testing purposes. It includes daily pollen levels as captured or simulated during the project.
+
+5. **`model.ipynb`**  
+   A Jupyter Notebook that generates predictive models for pollen levels in each valley using the data collected. This is a key component in building accurate forecasts.
+
+6. **`predictions.ipynb`**  
+   Another Jupyter Notebook designed to enable users to visualize and analyze prediction results. Proper execution of this notebook provides insights into pollen levels across the region.
+
+
+### How to Run
+
+To generate predictions for today's and tomorrow's pollen levels in the Trentino-Alto Adige region, follow these steps:
+
+1. **Configure Parameters**  
+   Open the `config.json` file and insert your preferred settings:
+   - Specify the **latitude** and **longitude** of the desired location.
+   - Choose the pollen types to include and set the **selected_pollen** parameter to your preferred pollen type.
+
+2. **Run the Prediction Notebook**  
+   Open the `predictions.ipynb` file and follow the steps outlined in the notebook.
+
+3. **Analyze Results**  
+   The output will display predictions for the desired location pollen levels, allowing for visualization and interpretation of the data.
+
+---
+
+
 ## Authors
 
 This project was developed by group 13, consisting of:

@@ -9,9 +9,13 @@ from retry_requests import retry
 from services.kafka_client import KafkaProducerWrapper
 from datetime import datetime, timedelta
 
+from dotenv import load_dotenv
 
-# ISO 8601 format FORMAT : what timzone=
-SIMULATION_TIME = "2024-06-01T14:00"
+# Load environment variables from .env file
+load_dotenv()
+
+# Access environment variables
+SIMULATION_TIME = os.getenv('SIMULATION_TIME')  # ISO 8601 format FORMAT
 
 def send_to_kafka(kafka, topic, data):
     # print(data)

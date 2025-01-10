@@ -21,6 +21,7 @@ def calculate_pei(environmental_data):
     # Calculate individual pollen scores
     pollen_scores = {}
     for pollen_type, weight in pollen_weights.items():
+        # print(environmental_data[pollen_type])
         pollen_scores[pollen_type] = environmental_data[pollen_type] * weight
 
     # Total pollen exposure index
@@ -134,7 +135,7 @@ def calculate_risk_score(environmental_data, user_data, weights):
 
     return final_score, pollen_scores
 
-def generate_recommendation(score, user_data, environmental_data, pollen_scores):
+def generate_recommendation(score, user_data, environmental_data, pollen_scores, avg_heart_rate, avg_ibi, avg_eda, avg_skin_temp, avg_activity_level):
     recommendations = []
 
     # General recommendation based on the score
@@ -186,7 +187,37 @@ def generate_recommendation(score, user_data, environmental_data, pollen_scores)
     if user_data["cad"] == 1:
         recommendations.append("Cardiac Health: High risk of exacerbation due to poor air quality. Avoid outdoor exertion, monitor your heart condition, and consult your doctor if necessary.")
 
+
+    # Live wereable data recommendations
+    # Heart rate recommendations
+    if avg_heart_rate > 100 and avg_activity_level < 0.3:
+        recommendations.append("Heart rate: Your heart rate is elevated. Consider taking a deep breath or a short break.")
+    elif avg_heart_rate < 50:
+        recommendations.append("Heart rate: Your heart rate is unusually low. If you feel unwell, consult a doctor.")
+
+    # # EDA recommendations
+    # if avg_eda > 10:
+    #     recommendations.append("Stress: You seem stressed. Try practicing mindfulness or calming activities.")
+
+    # Skin temperature recommendations
+    if avg_skin_temp > 37.5:
+        recommendations.append("Illness: Your skin temperature is high. Hydrate, rest, and monitor for illness symptoms.")
+
+    # # Activity level recommendations
+    # if avg_activity_level < 0.2:
+    #     recommendations.append("Consider moving around or stretching to stay active.")
+    # elif avg_activity_level > 0.8:
+    #     recommendations.append("Great activity level! Remember to rest and hydrate.")
+
+    # Combined recommendations
+    if avg_heart_rate > 120 and avg_eda > 9.8 and avg_activity_level > 0.7:
+        recommendations.append("Activity: You are highly active. Cool down and stay hydrated.")
+    elif avg_heart_rate > 99 and avg_eda > 9.9 and avg_activity_level < 0.3:
+        recommendations.append("Stress: You might be experiencing stress. Consider taking a short walk or relaxing.")
+
     return recommendations
+
+
 
 def normalize_environmental_data(env_data):
     normalized_data = {}
@@ -200,7 +231,7 @@ def normalize_environmental_data(env_data):
     return normalized_data
 
 # Main function to process user and environmental data
-def process_data(user_data, environmental_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level):
+def process_data(user_data, environmental_data, avg_heart_rate, avg_ibi, avg_eda, avg_skin_temp, avg_activity_level):
     # Weightings for the environmental factors based on literature
     weights = {
         "pollen": 1.0,  # Pollen weight reflects its direct impact on allergic individuals
@@ -224,7 +255,7 @@ def process_data(user_data, environmental_data, avg_heart_rate, avg_eda, avg_ski
     final_score, pollen_scores = calculate_risk_score(environmental_data, user_data, weights)
 
     # Generate personalized recommendations
-    recommendations = generate_recommendation(final_score, user_data, environmental_data, pollen_scores)
+    recommendations = generate_recommendation(final_score, user_data, environmental_data, pollen_scores, avg_heart_rate, avg_ibi, avg_eda, avg_skin_temp, avg_activity_level)
 
     # Return all the scores and the recommendations
     return {

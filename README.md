@@ -1,8 +1,8 @@
-# Project title
+# PollenSense: A Data-Driven System for Personalized Allergy Recommendations
 
 ##  Abstract
 
-This repository contains the source code and documentation for the 'project title' project, part of the course of Big Data Technologes at the University of Trento. The primary goal of the project is to provide real-time health recommendations to individuals affected by pollen allergies. By leveraging data from diverse sources such as meteorological APIs, wearable health devices, and user-reported symptoms and conditions, this system offers personalized advice to minimize allergen exposure and improve quality of life.
+This repository contains the source code and documentation for the 'PollenSense project, part of the course of Big Data Technologes at the University of Trento. The primary goal of the project is to provide real-time health recommendations to individuals affected by pollen allergies. By leveraging data from diverse sources such as meteorological APIs, wearable health devices, and user-reported symptoms and conditions, this system offers personalized advice to minimize allergen exposure and improve quality of life.
 
 ## Technologies
 
@@ -14,9 +14,7 @@ This repository contains the source code and documentation for the 'project titl
     -   Redis: In-memory data store used for caching and fast access to frequently queried information.
 -   **Data Processing and Analytics:**
     -   Apache Spark: Distributed data processing for high-velocity data streams.
-    -   Python (Pandas, NumPy): Data cleaning, preprocessing, and exploratory analysis.
--   **Machine Learning:**
-    -   Apache Spark MLlib: Scalable machine learning capabilities integrated with Spark for predictive modeling.
+-   **Synthetica data generation:**
     -   CTGAN (Conditional Tabular Generative Adversarial Network): Generates synthetic tabular data.
 -   **Deployment:**
     -   Docker: Containerization and orchestration of the system's microservices.
@@ -25,7 +23,7 @@ This repository contains the source code and documentation for the 'project titl
 
 ## Architecture
 
-Architecture file
+![Architecture file](architecture.png)
 
 
 ##  How to run
@@ -77,6 +75,8 @@ The core application is containerized and managed using Docker for easy setup an
 
 A summary of the project structure and the main files is reported below:
 
+`setup.py`:  Script that initializes the system.
+
 ### air_quality   
  -   `air_quality_fetch.py`: Script to fetch pollen and weather data and write it to Kafka.
  
@@ -109,16 +109,10 @@ A summary of the project structure and the main files is reported below:
  -   `user_generation.py`:  Script that send new user to the system.
 
 
- 
-
- - `setup.py`:  Script that initializes the system.
-
-
-
 ## Authors
 
 This project was developed by group 13, consisting of:
 
-- Mattia Rampazzo - https://github.com/mattia-rampazzo
-- Davide Giordani - https://github.com/DavideGiordani11
-- Tommaso Grotto - https://github.com/TommasoGrotto2
+- [Mattia Rampazzo](https://github.com/mattia-rampazzo)
+- [Davide Giordani](https://github.com/DavideGiordani11)
+- [Tommaso Grotto](https://github.com/TommasoGrotto2)

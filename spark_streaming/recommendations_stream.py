@@ -167,7 +167,7 @@ def write_to_kafka(spark_df):
 
 # Register UDF
 @udf(returnType=ArrayType(StringType()))
-def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level):
+def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_ibi, avg_eda, avg_skin_temp, avg_activity_level):
 
     # Initialize Redis connection
     r = RedisClient()
@@ -192,7 +192,7 @@ def get_recommendations(user_id, lat, lng, avg_heart_rate, avg_eda, avg_skin_tem
     # Close Connection
     r.close()
 
-    data = process_data(user_data, environmental_data, avg_heart_rate, avg_eda, avg_skin_temp, avg_activity_level)
+    data = process_data(user_data, environmental_data, avg_heart_rate, avg_ibi, avg_eda, avg_skin_temp, avg_activity_level)
 
     # print(data)
 
@@ -223,6 +223,7 @@ def main():
             first("lat").alias("lat"),
             first("lng").alias("lng"),
             mean("heart_rate").alias("avg_heart_rate"),
+            mean("ibi").alias("avg_ibi"),
             mean("eda").alias("avg_eda"),
             mean("skin_temp").alias("avg_skin_temp"),
             mean("activity_level").alias("avg_activity_level"),
@@ -230,7 +231,7 @@ def main():
         )
 
     # Finally get live recommendations
-    recommendations_df = windowed_df.withColumn("recommendations", get_recommendations(col("id"), col("lat"), col("lng"), col("avg_heart_rate"), col("avg_eda"), col("avg_skin_temp"), col("avg_activity_level") )).select("window", "recommendations", "count")
+    recommendations_df = windowed_df.withColumn("recommendations", get_recommendations(col("id"), col("lat"), col("lng"), col("avg_heart_rate"),col("avg_ibi"), col("avg_eda"), col("avg_skin_temp"), col("avg_activity_level") )).select("window", "recommendations", "count")
     
     # Prepare the DataFrame with 'key' and 'value' columns for Kafka
     out_df = recommendations_df.selectExpr(

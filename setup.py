@@ -19,8 +19,20 @@ AIR_QUALITY_TOPIC = os.getenv('AIR_QUALITY_TOPIC')
 WEREABLE_SIMULATOR_TOPIC = os.getenv('WEREABLE_SIMULATOR_TOPIC')
 HEALTH_RECOMMENDATIONS_TOPIC = os.getenv('HEALTH_RECOMMENDATIONS_TOPIC')
 USER_TOPIC = os.getenv('USER_TOPIC')
-USER_ID = os.getenv('USER_ID')
 
+# Simulation parameters
+USER_ID = os.getenv('USER_ID')
+eczema = os.getenv('ECZEMA') == 'True'
+hay_fever = os.getenv('HAY_FEVER') == 'True'
+cad_probability = float(os.getenv('CAD_PROBABILITY'))
+cad = os.getenv('CAD') == 'True'
+ragweed_pollen_allergy = os.getenv('RAGWEED_POLLEN_ALLERGY') == 'True'
+grass_pollen_allergy = os.getenv('GRASS_POLLEN_ALLERGY') == 'True'
+mugwort_pollen_allergy = os.getenv('MUGWORT_POLLEN_ALLERGY') == 'True'
+birch_pollen_allergy = os.getenv('BIRCH_POLLEN_ALLERGY') == 'True'
+alder_pollen_allergy = os.getenv('ALDER_POLLEN_ALLERGY') == 'True'
+olive_pollen_allergy = os.getenv('OLIVE_POLLEN_ALLERGY') == 'True'
+asthma_allergy = os.getenv('ASTHMA_ALLERGY') == 'True'
 
 # Cassandra environment variables
 CASSANDRA_CLUSTER = os.getenv('CASSANDRA_CLUSTER')
@@ -82,14 +94,7 @@ def setup_redis():
 
     initialize_municipalities(r, df_mun)
 
-
-def setup_cassandra():
-    # Connect to a cluster in a session
-    cassandra = CassandraClient(CASSANDRA_CLUSTER)
-    
-    cassandra.create_table_user()
-    cassandra.create_table_municipality_weather_data()
-
+def store_pregenerated_batch_of_users(cassandra):
     # Read df
     df_users = pd.read_csv('data/Users_synthetic_dataset.csv')
 
@@ -121,13 +126,15 @@ def setup_cassandra():
     # Transform each row into a dictionary
     list_of_dicts = df_users.to_dict(orient='records')
 
-    # Print the result
+    # Store the result
     for user in list_of_dicts:
         cassandra.add_user(user)
         # print(user)
 
-    # Define a user for the simulation, assign a fixed uuid
-    # 5693,1,1,25.5,0,6.6,2.8,5.5,3.0,6.3,2.2,0,1,0,0,0,0,1,1,0,1,1,0,0.02,0,0,1,0,0,1,0,1,1965-06-03
+def store_simulation_user(cassandra):
+    # Define a user for the simulation, assign a fixed uuid   
+    # Create user dict with first batch of non configurable params
+    # Note order of key value pairs is important for the cassandra query
     user = {
         'user_id': uuid.UUID(USER_ID),
         'gender': True,
@@ -143,28 +150,51 @@ def setup_cassandra():
         'pet_allergy': False,
         'family_history_asthma': True,
         'history_of_allergies': False,
-        'eczema': True,
-        'hay_fever': False,
+    }
+
+    # Set the configurable parameters
+    user['eczema'] = eczema
+    user['hay_fever'] = hay_fever
+
+    # Update with other non configurable params
+    user.update({
         'wheezing': False,
         'shortness_of_breath': False,
         'chest_tightness': True,
         'coughing': True,
         'nighttime_symptoms': False,
         'exercise_induced': True,
-        'obesity': True,
-        'cad_probability': 0.10,
-        'cad': True,
-        'ragweed_pollen_allergy': False,
-        'grass_pollen_allergy': True,
-        'mugwort_pollen_allergy': True,
-        'birch_pollen_allergy': False,
-        'alder_pollen_allergy': False,
-        'olive_pollen_allergy': True,
-        'asthma_allergy': True,
-        'date_of_birth': '1965-06-03'
-    }
+        'obesity': True
+    })
+
+    # Set the remainig configurable parameters
+    user['cad_probability'] = float(cad_probability)
+    user['cad'] = cad
+    user['ragweed_pollen_allergy'] = ragweed_pollen_allergy
+    user['grass_pollen_allergy'] = grass_pollen_allergy
+    user['mugwort_pollen_allergy'] = mugwort_pollen_allergy
+    user['birch_pollen_allergy'] = birch_pollen_allergy
+    user['alder_pollen_allergy'] = alder_pollen_allergy
+    user['olive_pollen_allergy'] = olive_pollen_allergy
+    user['asthma_allergy'] = asthma_allergy
+    user['date_of_birth'] = '1965-06-03'
+
+    print(user)
 
     cassandra.add_user(user)
+
+
+def setup_cassandra():
+    # Connect to a cluster in a session
+    cassandra = CassandraClient(CASSANDRA_CLUSTER)
+    
+    cassandra.create_table_user()
+    cassandra.create_table_municipality_weather_data()
+
+    # Load pregenerated user and simulation user to the db
+    store_pregenerated_batch_of_users(cassandra)
+    store_simulation_user(cassandra)
+    
     print("Data inserted successfully.")
 
     # Shutdown the Cassandra connection
